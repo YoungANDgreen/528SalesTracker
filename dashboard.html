@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Performance Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+
+        h1 {
+            margin: 20px 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        canvas {
+            max-width: 100%;
+            margin: 20px 0;
+        }
+
+        .file-upload {
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sales Performance Dashboard</h1>
+    <div class="container">
+        <input type="file" id="fileInput" class="file-upload" accept=".txt" />
+        <canvas id="salesChart"></canvas>
+    </div>
+
+    <script>
+        const salesGoals = {
+            LOCSEA: 1600000,
+            ROBTAY: 2000000,
+            MCISAM: 500000,
+        };
+
+        const chartLabels = Object.keys(salesGoals);
+        const salesData = [0, 0, 0]; // Initial data, will be updated
+        const goalData = Object.values(salesGoals);
+
+        // Initialize Chart.js
+        const ctx = document.getElementById('salesChart').getContext('2d');
+        const salesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartLabels,
+                datasets: [
+                    {
+                        label: 'Total Sales',
+                        data: salesData,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1,
+                    },
+                    {
+                        label: 'Quarterly Goals',
+                        data: goalData,
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (value) => `$${(value / 1000).toFixed(0)}k`,
+                        },
+                    },
+                },
+            },
+        });
+
+        // File upload handler
+        document.getElementById('fileInput').addEventListener('change', function (event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const content = e.target.result;
+                const lines = content.split('\n').filter((line) => line.trim() !== '');
+                const columnDefinitions = [
+                    { start: 0, length: 5 },
+                    { start: 6, length: 11 }, // col2: Salesperson name
+                    { start: 19, length: 10 },
+                    { start: 30, length: 51 },
+                    { start: 84, length: 11 }, // col5: Sales amount
+                ];
+
+                // Parse fixed-width data
+                const parsedData = lines.map((line) => {
+                    const entry = {};
+                    columnDefinitions.forEach((col, index) => {
+                        entry[`col${index + 1}`] = line.substr(col.start, col.length).trim();
+                    });
+                    return entry;
+                });
+
+                // Summarize sales
+                const salesSummary = {};
+                parsedData.forEach((entry) => {
+                    const name = entry.col2;
+                    const amount = parseFloat(entry.col5);
+                    if (!salesSummary[name]) {
+                        salesSummary[name] = 0;
+                    }
+                    salesSummary[name] += amount;
+                });
+
+                // Handle LOCROB case: Split its total between ROBTAY and LOCSEA
+                if (salesSummary['LOCROB']) {
+                    const locrobAmount = salesSummary['LOCROB'] / 2; // Split equally
+                    salesSummary['ROBTAY'] = (salesSummary['ROBTAY'] || 0) + locrobAmount;
+                    salesSummary['LOCSEA'] = (salesSummary['LOCSEA'] || 0) + locrobAmount;
+                }
+
+                // Update chart data
+                salesData[0] = salesSummary['LOCSEA'] || 0;
+                salesData[1] = salesSummary['ROBTAY'] || 0;
+                salesData[2] = salesSummary['MCISAM'] || 0;
+
+                salesChart.update();
+            };
+
+            reader.readAsText(file);
+        });
+    </script>
+</body>
+</html>
