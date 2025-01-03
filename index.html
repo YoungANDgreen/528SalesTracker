@@ -15,11 +15,11 @@
         }
 
         h1 {
-            margin: 21px 0;
+            margin: 20px 0;
         }
 
         .container {
-            max-width: 1700px;
+            max-width: 800px;
             margin: 0 auto;
             padding: 20px;
             background: white;
@@ -63,6 +63,7 @@
             LOCSEA: 1600000,
             ROBTAY: 2000000,
             MCISAM: 500000,
+            ENCMIG: 100000,
         };
 
         const chartLabels = Object.keys(salesGoals);
@@ -153,6 +154,7 @@
                 salesData[0] = salesSummary['LOCSEA'] || 0;
                 salesData[1] = salesSummary['ROBTAY'] || 0;
                 salesData[2] = salesSummary['MCISAM'] || 0;
+                salesData[3] = salesSummary['ENCMIG'] || 0;
 
                 salesChart.update();
             };
