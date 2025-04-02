@@ -154,7 +154,7 @@
                 const texture = loader.load(faceTextures[index]);
                 const planetMaterial = new THREE.SpriteMaterial({ map: texture });
                 const planet = new THREE.Sprite(planetMaterial);
-                planet.scale.set(10, 10, 1); // Size of the face
+                planet.scale.set(25, 25, 3); // Size of the face
                 planet.position.set(positions[index].x, positions[index].y, positions[index].z);
                 planet.userData = { name, sales: 0, goal: goalData[index], index };
                 scene.add(planet);
