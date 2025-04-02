@@ -366,7 +366,7 @@
                     planets.forEach((planet, i) => {
                         planet.userData.sales = salesData[i];
                         const percentage = Math.min((salesData[i] / goalData[i]) * 100, 100);
-                        planet.material.color.set(percentage >= 100 ? 0x00ff00 : percentage >= 75 ? 0xffff00 : 0xff0000); // Tint sprite
+                        planet.material.color.set(percentage >= 100 ? 0x00ff00); // Tint sprite
                         gsap.to(rings[i].scale, { x: percentage / 100, y: percentage / 100, z: 1, duration: 1 });
                         if (percentage >= 100) explodePlanet(planet);
                         console.log(`Planet ${planet.userData.name}: Sales=${salesData[i]}, Goal=${goalData[i]}, Percentage=${percentage}%`);
