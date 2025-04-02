@@ -181,9 +181,9 @@
                     const chartBox = sidebar.append('div').attr('class', 'chart-box');
                     chartBox.append('h3').text(name);
                     const svg = chartBox.append('svg').attr('id', `chart-${name}`);
-                    const width = 400;
-                    const height = 350;
-                    const margin = { top: 10, right: 10, bottom: 20, left: 40 };
+                    const width = 300;
+                    const height = 250;
+                    const margin = { top: 10, right: 10, bottom: 20, left: 20 };
 
                     const x = d3.scaleLinear().domain([0, 4]).range([margin.left, width - margin.right]);
                     const y = d3.scaleLinear().domain([0, goalData[i] * 1.2]).range([height - margin.bottom, margin.top]);
@@ -289,10 +289,10 @@
                         const percentage = planet.userData.sales / planet.userData.goal * 100;
                         if (percentage >= 50) {
                             explodePlanet(planet);
-                            confetti({ particleCount: 200, spread: 100 });
+                            confetti({ particleCount: 5000, spread: 1000 });
                         } else if (percentage >= 100) {
                             explodePlanet(planet);
-                            confetti({ particleCount: 2000, spread: 200 });
+                            confetti({ particleCount: 20000, spread: 2000 });
                         } else {
                             gsap.to(rings[chartLabels.indexOf(planet.userData.name)], {
                                 scale: { x: 1.2, y: 1.2, z: 1 },
