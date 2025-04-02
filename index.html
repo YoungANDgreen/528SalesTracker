@@ -160,7 +160,7 @@
                 scene.add(planet);
                 planets.push(planet);
 
-                const ringGeometry = new THREE.TorusGeometry(7, 0.2, 16, 100);
+                const ringGeometry = new THREE.TorusGeometry(21, 0.6, 48, 100);
                 const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xff007a, side: THREE.DoubleSide });
                 const ring = new THREE.Mesh(ringGeometry, ringMaterial);
                 ring.rotation.x = Math.PI / 2;
@@ -304,7 +304,7 @@
                     const planet = intersects[0].object;
                     if (selectedPlanet !== planet) {
                         selectedPlanet = planet;
-                        gsap.to(planet.scale, { x: 15, y: 15, z: 1, duration: 0.5 });
+                        gsap.to(planet.scale, { x: 35, y: 35, z: 4, duration: 0.5 });
                         planets.forEach(p => { if (p !== planet) gsap.to(p.scale, { x: 10, y: 10, z: 1, duration: 0.5 }); });
                         const percentage = planet.userData.sales / planet.userData.goal * 100;
                         if (percentage >= 100) {
