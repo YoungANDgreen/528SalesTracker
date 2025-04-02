@@ -147,7 +147,7 @@
             const colors = [0x00ff00, 0xffff00, 0xff00ff, 0x00ffff]; // Unique colors
             chartLabels.forEach((name, index) => {
                 // Custom Planet (Box for now, replace with icons later)
-                const planetGeometry = new THREE.BoxGeometry(3, 3, 3);
+                const planetGeometry = new THREE.BoxGeometry(10, 10, 10);
                 const planetMaterial = new THREE.MeshBasicMaterial({ color: colors[index] });
                 const planet = new THREE.Mesh(planetGeometry, planetMaterial);
                 planet.position.set(positions[index].x, positions[index].y, positions[index].z);
@@ -155,7 +155,7 @@
                 scene.add(planet);
                 planets.push(planet);
 
-                const ringGeometry = new THREE.TorusGeometry(5, 0.2, 16, 100);
+                const ringGeometry = new THREE.TorusGeometry(5, 0.2, 20, 100);
                 const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xff007a, side: THREE.DoubleSide });
                 const ring = new THREE.Mesh(ringGeometry, ringMaterial);
                 ring.rotation.x = Math.PI / 2;
@@ -200,8 +200,8 @@
                     const chartBox = sidebar.append('div').attr('class', 'chart-box');
                     chartBox.append('h3').text(name);
                     const svg = chartBox.append('svg').attr('id', `chart-${name}`);
-                    const width = 3000;
-                    const height = 250;
+                    const width = 325;
+                    const height = 270;
                     const margin = { top: 10, right: 10, bottom: 20, left: 40 };
 
                     const x = d3.scaleLinear().domain([0, 4]).range([margin.left, width - margin.right]);
@@ -302,7 +302,7 @@
                         const percentage = planet.userData.sales / planet.userData.goal * 100;
                         if (percentage >= 100) {
                             explodePlanet(planet);
-                            confetti({ particleCount: 50000, spread: 10000 });
+                            confetti({ particleCount: 5000, spread: 1000 });
                         } else {
                             gsap.to(rings[planet.userData.index].scale, { x: 1.2, y: 1.2, z: 1, duration: 0.5, yoyo: true, repeat: 1 });
                         }
