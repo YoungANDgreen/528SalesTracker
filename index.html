@@ -89,14 +89,14 @@
 
         function init() {
             const salesGoals = {
-                LOCSEA: 1300000,
-                ROBTAY: 1900000,
-                MCISAM: 600000,
-                ENCMIG: 200000,
+                LOCSEA: 1600000,
+                ROBTAY: 2000000,
+                MCISAM: 500000,
+                ENCMIG: 100000,
             };
 
             const chartLabels = Object.keys(salesGoals);
-            const salesData = [0, 0, 0, 0]; // Correctly sized for 4 salespeople
+            const salesData = [0, 0, 0, 0];
             const goalData = Object.values(salesGoals);
             const totalGoal = goalData.reduce((sum, val) => sum + val, 0);
 
@@ -135,31 +135,49 @@
             const hub = new THREE.Mesh(hubGeometry, hubMaterial);
             scene.add(hub);
 
-            // Planets and Rings
+            // Planets and Rings with Unique Layout
             const planets = [];
             const rings = [];
+            const positions = [
+                { x: -20, y: 10, z: -20 }, // LOCSEA
+                { x: 20, y: 5, z: -15 },  // ROBTAY
+                { x: -15, y: -5, z: -25 }, // MCISAM
+                { x: 15, y: -10, z: -30 }  // ENCMIG
+            ];
+            const colors = [0x00ff00, 0xffff00, 0xff00ff, 0x00ffff]; // Unique colors
             chartLabels.forEach((name, index) => {
-                const angle = (index / chartLabels.length) * Math.PI * 2;
-                const radius = 20 + index * 5;
-                const planetGeometry = new THREE.SphereGeometry(2, 32, 32);
-                const planetMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+                // Custom Planet (Box for now, replace with icons later)
+                const planetGeometry = new THREE.BoxGeometry(3, 3, 3);
+                const planetMaterial = new THREE.MeshBasicMaterial({ color: colors[index] });
                 const planet = new THREE.Mesh(planetGeometry, planetMaterial);
-                planet.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius - 10);
-                planet.userData = { name, sales: 0, goal: goalData[index], index }; // Store index for mapping
+                planet.position.set(positions[index].x, positions[index].y, positions[index].z);
+                planet.userData = { name, sales: 0, goal: goalData[index], index };
                 scene.add(planet);
                 planets.push(planet);
 
-                const ringGeometry = new THREE.TorusGeometry(radius + 2, 0.2, 16, 100);
+                const ringGeometry = new THREE.TorusGeometry(5, 0.2, 16, 100);
                 const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xff007a, side: THREE.DoubleSide });
                 const ring = new THREE.Mesh(ringGeometry, ringMaterial);
                 ring.rotation.x = Math.PI / 2;
-                ring.position.z = -10;
+                ring.position.copy(planet.position);
                 scene.add(ring);
                 rings.push(ring);
-            });
-            console.log(`Created ${planets.length} planets and ${rings.length} rings`); // Debug log
 
-            camera.position.z = 50;
+                // Glowing Trail
+                const trailGeometry = new THREE.BufferGeometry();
+                const trailMaterial = new THREE.PointsMaterial({ color: colors[index], size: 0.3, transparent: true, opacity: 0.5 });
+                const trailVertices = [];
+                for (let i = 0; i < 50; i++) {
+                    trailVertices.push(planet.position.x + Math.sin(i * 0.1) * 5, planet.position.y + i * 0.2 - 5, planet.position.z);
+                }
+                trailGeometry.setAttribute('position', new THREE.Float32BufferAttribute(trailVertices, 3));
+                const trail = new THREE.Points(trailGeometry, trailMaterial);
+                scene.add(trail);
+            });
+            console.log(`Created ${planets.length} planets and ${rings.length} rings`);
+
+            camera.position.set(0, 20, 60);
+            camera.lookAt(0, 0, 0);
 
             // Animation Loop
             function animate() {
@@ -239,13 +257,7 @@
                 const particles = new THREE.Points(particleGeometry, particleMaterial);
                 scene.add(particles);
 
-                gsap.to(particles.position, {
-                    x: '+=10',
-                    y: '+=10',
-                    z: '+=10',
-                    duration: 2,
-                    onComplete: () => scene.remove(particles)
-                });
+                gsap.to(particles.position, { x: '+=10', y: '+=10', z: '+=10', duration: 2, onComplete: () => scene.remove(particles) });
                 gsap.to(particles.material, { opacity: 0, duration: 2 });
             }
 
@@ -290,14 +302,9 @@
                         const percentage = planet.userData.sales / planet.userData.goal * 100;
                         if (percentage >= 100) {
                             explodePlanet(planet);
-                            confetti({ particleCount: 50000, spread: 10000 });
+                            confetti({ particleCount: 200, spread: 100 });
                         } else {
-                            gsap.to(rings[planet.userData.index], {
-                                scale: { x: 1.2, y: 1.2, z: 1 },
-                                duration: 0.5,
-                                yoyo: true,
-                                repeat: 1
-                            });
+                            gsap.to(rings[planet.userData.index].scale, { x: 1.2, y: 1.2, z: 1, duration: 0.5, yoyo: true, repeat: 1 });
                         }
                     }
                 }
@@ -314,10 +321,10 @@
                     const lines = content.split('\n').filter((line) => line.trim() !== '');
                     const columnDefinitions = [
                         { start: 0, length: 5 },
-                        { start: 6, length: 11 }, // col2: Salesperson name
+                        { start: 6, length: 11 },
                         { start: 19, length: 10 },
                         { start: 30, length: 51 },
-                        { start: 83, length: 11 }, // col5: Sales amount
+                        { start: 83, length: 11 },
                     ];
 
                     const parsedData = lines.map((line) => {
@@ -347,7 +354,7 @@
                     salesData[2] = salesSummary['MCISAM'] || 0;
                     salesData[3] = salesSummary['ENCMIG'] || 0;
 
-                    console.log('Sales Data:', salesData); // Debug log
+                    console.log('Sales Data:', salesData);
 
                     // Update Visuals
                     planets.forEach((planet, i) => {
@@ -356,7 +363,7 @@
                         planet.material.color.set(percentage >= 100 ? 0x00ff00 : percentage >= 75 ? 0xffff00 : 0xff0000);
                         gsap.to(rings[i].scale, { x: percentage / 100, y: percentage / 100, z: 1, duration: 1 });
                         if (percentage >= 100) confetti({ particleCount: 100, spread: 70 });
-                        console.log(`Planet ${planet.userData.name}: Sales=${salesData[i]}, Goal=${goalData[i]}, Percentage=${percentage}%`); // Debug log
+                        console.log(`Planet ${planet.userData.name}: Sales=${salesData[i]}, Goal=${goalData[i]}, Percentage=${percentage}%`);
                     });
                     updateCharts();
                 };
