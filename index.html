@@ -4,50 +4,89 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sales Performance Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Poppins', sans-serif;
             text-align: center;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f9;
+            background: #1a1a2e;
+            color: #e0e0e0;
         }
-
         h1 {
             margin: 20px 0;
+            font-size: 2.5em;
+            color: #00d4ff;
         }
-
         .container {
             max-width: 1600px;
-            margin: 0 auto;
+            margin: 20px auto;
             padding: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
-
-        canvas {
-            max-width: 100%;
-            margin: 20px 0;
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 20px;
         }
-
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            transition: transform 0.3s;
+        }
+        .card:hover {
+            transform: scale(1.05);
+        }
+        .progress-bar {
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #ff007a);
+            transition: width 1s ease-in-out;
+        }
+        .badge {
+            display: block;
+            color: #ffcc00;
+            font-weight: 600;
+            margin-top: 10px;
+        }
         .file-upload {
             margin: 20px 0;
         }
-
         button {
             padding: 10px 20px;
             font-size: 16px;
-            background-color: #007bff;
+            background: #ff007a;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            transition: background 0.3s;
         }
-
         button:hover {
-            background-color: #0056b3;
+            background: #cc0066;
+        }
+        #leaderboard {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        #leaderboard h2 {
+            color: #00d4ff;
         }
     </style>
 </head>
@@ -55,7 +94,8 @@
     <h1>Sales Performance Dashboard</h1>
     <div class="container">
         <input type="file" id="fileInput" class="file-upload" accept=".txt" />
-        <canvas id="salesChart"></canvas>
+        <div id="salesGrid" class="grid"></div>
+        <div id="leaderboard"></div>
     </div>
 
     <script>
@@ -67,44 +107,43 @@
         };
 
         const chartLabels = Object.keys(salesGoals);
-        const salesData = [0, 0, 0]; // Initial data, will be updated
+        const salesData = [0, 0, 0, 0]; // Initial data, will be updated
         const goalData = Object.values(salesGoals);
 
-        // Initialize Chart.js
-        const ctx = document.getElementById('salesChart').getContext('2d');
-        const salesChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: chartLabels,
-                datasets: [
-                    {
-                        label: 'Total Sales',
-                        data: salesData,
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        borderWidth: 1,
-                    },
-                    {
-                        label: 'Quarterly Goals',
-                        data: goalData,
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 1,
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: (value) => `$${(value / 1000).toFixed(0)}k`,
-                        },
-                    },
-                },
-            },
-        });
+        function updateDashboard(salesSummary) {
+            const salesGrid = document.getElementById('salesGrid');
+            salesGrid.innerHTML = ''; // Clear previous cards
+            const rankings = [];
+
+            chartLabels.forEach((name, index) => {
+                const sales = salesData[index] || 0;
+                const goal = goalData[index];
+                const percentage = Math.min((sales / goal) * 100, 100).toFixed(1);
+                const remaining = (goal - sales).toFixed(0);
+
+                // Card HTML
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <h3>${name}</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percentage}%"></div>
+                    </div>
+                    <p>${percentage}% to Goal | $${remaining > 0 ? remaining : 0} left</p>
+                    ${percentage >= 100 ? '<span class="badge">Goal Crusher 🎉</span>' : percentage >= 75 ? '<span class="badge">Almost There!</span>' : percentage >= 50 ? '<span class="badge">Rookie Star</span>' : ''}
+                `;
+                salesGrid.appendChild(card);
+
+                // Rankings
+                rankings.push({ name, percentage });
+                if (percentage >= 100) confetti({ particleCount: 100, spread: 70 });
+            });
+
+            // Leaderboard
+            rankings.sort((a, b) => b.percentage - a.percentage);
+            const leaderboard = document.getElementById('leaderboard');
+            leaderboard.innerHTML = '<h2>Leaderboard</h2>' + rankings.map((r, i) => `<p>${i + 1}. ${r.name} - ${r.percentage}%</p>`).join('');
+        }
 
         // File upload handler
         document.getElementById('fileInput').addEventListener('change', function (event) {
@@ -141,8 +180,6 @@
                         salesSummary[name] = 0;
                     }
                     salesSummary[name] += amount;
-                    console.log(salesSummary['ROBTAY']);
-                    console.log(salesSummary['LOCSEA']);
                 });
 
                 // Handle LOCROB case: Split its total between ROBTAY and LOCSEA
@@ -152,13 +189,13 @@
                     salesSummary['LOCSEA'] = (salesSummary['LOCSEA'] || 0) + locrobAmount;
                 }
 
-                // Update chart data
+                // Update sales data
                 salesData[0] = salesSummary['LOCSEA'] || 0;
                 salesData[1] = salesSummary['ROBTAY'] || 0;
                 salesData[2] = salesSummary['MCISAM'] || 0;
                 salesData[3] = salesSummary['ENCMIG'] || 0;
 
-                salesChart.update();
+                updateDashboard(salesSummary);
             };
 
             reader.readAsText(file);
