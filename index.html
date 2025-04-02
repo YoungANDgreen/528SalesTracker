@@ -3,142 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Performance Dashboard</title>
+    <title>Sales Galaxy Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/three@0.175.0/build/three.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         body {
-            font-family: 'Poppins', sans-serif;
-            text-align: center;
             margin: 0;
             padding: 0;
-            background: #1a1a2e;
+            background: #0a0a1a;
+            font-family: 'Poppins', sans-serif;
             color: #e0e0e0;
-        }
-        h1 {
-            margin: 20px 0;
-            font-size: 2.5em;
-            color: #00d4ff;
-        }
-        .container {
-            max-width: 1600px;
-            margin: 20px auto;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            padding: 20px;
-        }
-        .card {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 20px;
-            transition: transform 0.3s;
-        }
-        .card:hover {
-            transform: scale(1.05);
-        }
-        .progress-bar {
-            height: 20px;
-            background: #333;
-            border-radius: 10px;
             overflow: hidden;
-            margin: 10px 0;
         }
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #00d4ff, #ff007a);
-            transition: width 1s ease-in-out;
-        }
-        .badge {
-            display: block;
-            color: #ffcc00;
-            font-weight: 600;
-            margin-top: 10px;
-        }
-        .file-upload {
-            margin: 20px 0;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background: #ff007a;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        button:hover {
-            background: #cc0066;
-        }
-        #leaderboard {
-            margin: 20px 0;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-        }
-        #leaderboard h2 {
-            color: #00d4ff;
-        }
-        #rocketContainer {
+        #scene-container {
+            width: 100vw;
+            height: 100vh;
             position: relative;
-            height: 300px;
-            width: 200px;
-            margin: 20px auto;
-            background: radial-gradient(circle at center, #2a2a4e 0%, #1a1a2e 70%);
-            border-radius: 10px;
-            overflow: hidden;
         }
-        #rocket {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 50px;
-            height: 100px;
-            background: linear-gradient(0deg, #ff007a, #00d4ff);
-            border-radius: 50px 50px 0 0;
-            transition: bottom 1s ease-in-out;
-        }
-        #rocket::after {
-            content: '';
-            position: absolute;
-            bottom: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 20px;
-            height: 20px;
-            background: #ffcc00;
-            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-        }
-        #rocketMessage {
+        #fileInput {
             position: absolute;
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 1.2em;
-            color: #ffcc00;
+            z-index: 10;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #00d4ff;
+            border-radius: 5px;
+            color: #fff;
+        }
+        #tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            z-index: 20;
+            display: none;
+        }
+        #chart-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 400px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            display: none;
+            z-index: 10;
+        }
+        svg {
+            width: 100%;
+            height: 100%;
         }
     </style>
 </head>
 <body>
-    <h1>Sales Performance Dashboard</h1>
-    <div class="container">
-        <input type="file" id="fileInput" class="file-upload" accept=".txt" />
-        <div id="salesGrid" class="grid"></div>
-        <div id="leaderboard"></div>
-        <div id="rocketContainer">
-            <div id="rocket"></div>
-            <div id="rocketMessage"></div>
-        </div>
+    <input type="file" id="fileInput" accept=".txt" />
+    <div id="scene-container"></div>
+    <div id="tooltip"></div>
+    <div id="chart-container">
+        <svg id="detail-chart"></svg>
     </div>
 
     <script>
@@ -150,56 +79,169 @@
         };
 
         const chartLabels = Object.keys(salesGoals);
-        const salesData = [0, 0, 0, 0]; // Initial data, will be updated
+        const salesData = [0, 0, 0, 0];
         const goalData = Object.values(salesGoals);
         const totalGoal = goalData.reduce((sum, val) => sum + val, 0);
 
-        function updateDashboard(salesSummary) {
-            const salesGrid = document.getElementById('salesGrid');
-            salesGrid.innerHTML = ''; // Clear previous cards
-            const rankings = [];
+        // Three.js Setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('scene-container').appendChild(renderer.domElement);
 
-            chartLabels.forEach((name, index) => {
-                const sales = salesData[index] || 0;
-                const goal = goalData[index];
-                const percentage = Math.min((sales / goal) * 100, 100).toFixed(1);
-                const remaining = (goal - sales).toFixed(0);
+        // Background Stars
+        const starGeometry = new THREE.BufferGeometry();
+        const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 });
+        const starVertices = [];
+        for (let i = 0; i < 10000; i++) {
+            starVertices.push((Math.random() - 0.5) * 2000, (Math.random() - 0.5) * 2000, (Math.random() - 0.5) * 2000);
+        }
+        starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
 
-                // Card HTML
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
-                    <h3>${name}</h3>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${percentage}%"></div>
-                    </div>
-                    <p>${percentage}% to Goal | $${remaining > 0 ? remaining : 0} left</p>
-                    ${percentage >= 100 ? '<span class="badge">Goal Crusher 🎉</span>' : percentage >= 75 ? '<span class="badge">Almost There!</span>' : percentage >= 50 ? '<span class="badge">Rookie Star</span>' : ''}
-                `;
-                salesGrid.appendChild(card);
+        // Nebula (Simple Particle Cloud)
+        const nebulaGeometry = new THREE.BufferGeometry();
+        const nebulaMaterial = new THREE.PointsMaterial({ color: 0x00d4ff, size: 2, transparent: true, opacity: 0.3 });
+        const nebulaVertices = [];
+        for (let i = 0; i < 500; i++) {
+            nebulaVertices.push((Math.random() - 0.5) * 1000, (Math.random() - 0.5) * 1000, (Math.random() - 0.5) * 1000);
+        }
+        nebulaGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nebulaVertices, 3));
+        const nebula = new THREE.Points(nebulaGeometry, nebulaMaterial);
+        scene.add(nebula);
 
-                // Rankings
-                rankings.push({ name, percentage });
-                if (percentage >= 100) confetti({ particleCount: 100, spread: 70 });
+        // Central Hub
+        const hubGeometry = new THREE.SphereGeometry(5, 32, 32);
+        const hubMaterial = new THREE.MeshBasicMaterial({ color: 0x00d4ff });
+        const hub = new THREE.Mesh(hubGeometry, hubMaterial);
+        scene.add(hub);
+
+        // Planets and Rings
+        const planets = [];
+        const rings = [];
+        chartLabels.forEach((name, index) => {
+            const angle = (index / chartLabels.length) * Math.PI * 2;
+            const radius = 20 + index * 5;
+            const planetGeometry = new THREE.SphereGeometry(2, 32, 32);
+            const planetMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+            planet.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius - 10);
+            planet.userData = { name, sales: 0, goal: goalData[index] };
+            scene.add(planet);
+            planets.push(planet);
+
+            const ringGeometry = new THREE.TorusGeometry(radius + 2, 0.2, 16, 100);
+            const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xff007a, side: THREE.DoubleSide });
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            ring.rotation.x = Math.PI / 2;
+            ring.position.z = -10;
+            scene.add(ring);
+            rings.push(ring);
+        });
+
+        camera.position.z = 50;
+
+        // Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            stars.rotation.y += 0.0005;
+            nebula.rotation.y += 0.0002;
+            gsap.to(hub.scale, { x: 1.1, y: 1.1, z: 1.1, duration: 1, yoyo: true, repeat: -1 });
+            planets.forEach((planet, i) => {
+                planet.rotation.y += 0.01;
+                rings[i].rotation.z += 0.005;
             });
+            renderer.render(scene, camera);
+        }
+        animate();
 
-            // Leaderboard
-            rankings.sort((a, b) => b.percentage - a.percentage);
-            const leaderboard = document.getElementById('leaderboard');
-            leaderboard.innerHTML = '<h2>Leaderboard</h2>' + rankings.map((r, i) => `<p>${i + 1}. ${r.name} - ${r.percentage}%</p>`).join('');
+        // Raycaster for Interactivity
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let selectedPlanet = null;
 
-            // Rocket Animation
-            const totalSales = salesData.reduce((sum, val) => sum + val, 0);
-            const teamPercentage = Math.min((totalSales / totalGoal) * 100, 100);
-            const rocket = document.getElementById('rocket');
-            const rocketHeight = 200; // Max height in pixels
-            const newBottom = (teamPercentage / 100) * rocketHeight;
-            rocket.style.bottom = `${newBottom + 10}px`;
-            const rocketMessage = document.getElementById('rocketMessage');
-            rocketMessage.textContent = teamPercentage >= 100 ? 'To the Moon! 🚀' : `Team: ${teamPercentage.toFixed(1)}%`;
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(planets);
+            const tooltip = document.getElementById('tooltip');
+            if (intersects.length > 0) {
+                const planet = intersects[0].object;
+                tooltip.style.display = 'block';
+                tooltip.style.left = `${event.clientX + 10}px`;
+                tooltip.style.top = `${event.clientY + 10}px`;
+                tooltip.innerHTML = `
+                    <strong>${planet.userData.name}</strong><br>
+                    Sales: $${planet.userData.sales.toLocaleString()}<br>
+                    Goal: $${planet.userData.goal.toLocaleString()}<br>
+                    Progress: ${(planet.userData.sales / planet.userData.goal * 100).toFixed(1)}%
+                `;
+            } else {
+                tooltip.style.display = 'none';
+            }
+        });
+
+        window.addEventListener('click', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(planets);
+            if (intersects.length > 0) {
+                const planet = intersects[0].object;
+                if (selectedPlanet !== planet) {
+                    selectedPlanet = planet;
+                    gsap.to(planet.scale, { x: 2.5, y: 2.5, z: 2.5, duration: 0.5 });
+                    planets.forEach(p => { if (p !== planet) gsap.to(p.scale, { x: 1, y: 1, z: 1, duration: 0.5 }); });
+                    showDetailChart(planet.userData);
+                }
+            }
+        });
+
+        // Detailed Chart with D3.js
+        function showDetailChart(data) {
+            const chartContainer = document.getElementById('chart-container');
+            chartContainer.style.display = 'block';
+            const svg = d3.select('#detail-chart').html('');
+            const width = 360;
+            const height = 260;
+            const margin = { top: 20, right: 20, bottom: 30, left: 50 };
+
+            const x = d3.scaleLinear().domain([0, 4]).range([margin.left, width - margin.right]);
+            const y = d3.scaleLinear().domain([0, data.goal * 1.2]).range([height - margin.bottom, margin.top]);
+
+            svg.append('g')
+                .attr('transform', `translate(0,${height - margin.bottom})`)
+                .call(d3.axisBottom(x).ticks(5));
+            svg.append('g')
+                .attr('transform', `translate(${margin.left},0)`)
+                .call(d3.axisLeft(y).tickFormat(d => `$${d / 1000}k`));
+
+            const line = d3.line()
+                .x((d, i) => x(i))
+                .y(d => y(d))
+                .curve(d3.curveMonotoneX);
+
+            const pathData = [0, data.sales / 2, data.sales]; // Simulated trend
+            const path = svg.append('path')
+                .datum(pathData)
+                .attr('fill', 'none')
+                .attr('stroke', '#ff007a')
+                .attr('stroke-width', 2)
+                .attr('d', line);
+
+            const totalLength = path.node().getTotalLength();
+            path.attr('stroke-dasharray', `${totalLength} ${totalLength}`)
+                .attr('stroke-dashoffset', totalLength)
+                .transition()
+                .duration(1000)
+                .ease(d3.easeLinear)
+                .attr('stroke-dashoffset', 0);
         }
 
-        // File upload handler
+        // File Upload Handler
         document.getElementById('fileInput').addEventListener('change', function (event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -216,7 +258,6 @@
                     { start: 83, length: 11 }, // col5: Sales amount
                 ];
 
-                // Parse fixed-width data
                 const parsedData = lines.map((line) => {
                     const entry = {};
                     columnDefinitions.forEach((col, index) => {
@@ -225,34 +266,42 @@
                     return entry;
                 });
 
-                // Summarize sales
                 const salesSummary = {};
                 parsedData.forEach((entry) => {
                     const name = entry.col2;
                     const amount = parseFloat(entry.col5);
-                    if (!salesSummary[name]) {
-                        salesSummary[name] = 0;
-                    }
+                    if (!salesSummary[name]) salesSummary[name] = 0;
                     salesSummary[name] += amount;
                 });
 
-                // Handle LOCROB case: Split its total between ROBTAY and LOCSEA
                 if (salesSummary['LOCROB']) {
-                    const locrobAmount = salesSummary['LOCROB'] / 2; // Split equally
+                    const locrobAmount = salesSummary['LOCROB'] / 2;
                     salesSummary['ROBTAY'] = (salesSummary['ROBTAY'] || 0) + locrobAmount;
                     salesSummary['LOCSEA'] = (salesSummary['LOCSEA'] || 0) + locrobAmount;
                 }
 
-                // Update sales data
                 salesData[0] = salesSummary['LOCSEA'] || 0;
                 salesData[1] = salesSummary['ROBTAY'] || 0;
                 salesData[2] = salesSummary['MCISAM'] || 0;
                 salesData[3] = salesSummary['ENCMIG'] || 0;
 
-                updateDashboard(salesSummary);
+                // Update Visuals
+                planets.forEach((planet, i) => {
+                    planet.userData.sales = salesData[i];
+                    const percentage = Math.min((salesData[i] / goalData[i]) * 100, 100);
+                    planet.material.color.set(percentage >= 100 ? 0x00ff00 : percentage >= 75 ? 0xffff00 : 0xff0000);
+                    gsap.to(rings[i].scale, { x: percentage / 100, y: percentage / 100, z: 1, duration: 1 });
+                    if (percentage >= 100) confetti({ particleCount: 100, spread: 70 });
+                });
             };
-
             reader.readAsText(file);
+        });
+
+        // Resize Handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         });
     </script>
 </body>
