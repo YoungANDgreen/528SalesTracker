@@ -88,6 +88,45 @@
         #leaderboard h2 {
             color: #00d4ff;
         }
+        #rocketContainer {
+            position: relative;
+            height: 300px;
+            width: 200px;
+            margin: 20px auto;
+            background: radial-gradient(circle at center, #2a2a4e 0%, #1a1a2e 70%);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #rocket {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 100px;
+            background: linear-gradient(0deg, #ff007a, #00d4ff);
+            border-radius: 50px 50px 0 0;
+            transition: bottom 1s ease-in-out;
+        }
+        #rocket::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 20px;
+            background: #ffcc00;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        }
+        #rocketMessage {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.2em;
+            color: #ffcc00;
+        }
     </style>
 </head>
 <body>
@@ -96,6 +135,10 @@
         <input type="file" id="fileInput" class="file-upload" accept=".txt" />
         <div id="salesGrid" class="grid"></div>
         <div id="leaderboard"></div>
+        <div id="rocketContainer">
+            <div id="rocket"></div>
+            <div id="rocketMessage"></div>
+        </div>
     </div>
 
     <script>
@@ -109,6 +152,7 @@
         const chartLabels = Object.keys(salesGoals);
         const salesData = [0, 0, 0, 0]; // Initial data, will be updated
         const goalData = Object.values(salesGoals);
+        const totalGoal = goalData.reduce((sum, val) => sum + val, 0);
 
         function updateDashboard(salesSummary) {
             const salesGrid = document.getElementById('salesGrid');
@@ -143,6 +187,16 @@
             rankings.sort((a, b) => b.percentage - a.percentage);
             const leaderboard = document.getElementById('leaderboard');
             leaderboard.innerHTML = '<h2>Leaderboard</h2>' + rankings.map((r, i) => `<p>${i + 1}. ${r.name} - ${r.percentage}%</p>`).join('');
+
+            // Rocket Animation
+            const totalSales = salesData.reduce((sum, val) => sum + val, 0);
+            const teamPercentage = Math.min((totalSales / totalGoal) * 100, 100);
+            const rocket = document.getElementById('rocket');
+            const rocketHeight = 200; // Max height in pixels
+            const newBottom = (teamPercentage / 100) * rocketHeight;
+            rocket.style.bottom = `${newBottom + 10}px`;
+            const rocketMessage = document.getElementById('rocketMessage');
+            rocketMessage.textContent = teamPercentage >= 100 ? 'To the Moon! 🚀' : `Team: ${teamPercentage.toFixed(1)}%`;
         }
 
         // File upload handler
