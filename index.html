@@ -49,7 +49,7 @@
             position: absolute;
             right: 0;
             top: 0;
-            width: 20vw;
+            width: 25vw;
             height: 100vh;
             background: rgba(255, 255, 255, 0.05);
             padding: 20px;
@@ -66,7 +66,7 @@
         }
         .chart-box svg {
             width: 100%;
-            height: 200px;
+            height: 150px;
         }
     </style>
 </head>
@@ -96,7 +96,7 @@
             };
 
             const chartLabels = Object.keys(salesGoals);
-            const salesData = [0, 0, 0, 0, 0];
+            const salesData = [0, 0, 0, 0]; // Correctly sized for 4 salespeople
             const goalData = Object.values(salesGoals);
             const totalGoal = goalData.reduce((sum, val) => sum + val, 0);
 
@@ -145,7 +145,7 @@
                 const planetMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
                 const planet = new THREE.Mesh(planetGeometry, planetMaterial);
                 planet.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius - 10);
-                planet.userData = { name, sales: 0, goal: goalData[index] };
+                planet.userData = { name, sales: 0, goal: goalData[index], index }; // Store index for mapping
                 scene.add(planet);
                 planets.push(planet);
 
@@ -157,6 +157,7 @@
                 scene.add(ring);
                 rings.push(ring);
             });
+            console.log(`Created ${planets.length} planets and ${rings.length} rings`); // Debug log
 
             camera.position.z = 50;
 
@@ -181,9 +182,9 @@
                     const chartBox = sidebar.append('div').attr('class', 'chart-box');
                     chartBox.append('h3').text(name);
                     const svg = chartBox.append('svg').attr('id', `chart-${name}`);
-                    const width = 250;
-                    const height = 200;
-                    const margin = { top: 10, right: 10, bottom: 20, left: 30 };
+                    const width = 200;
+                    const height = 150;
+                    const margin = { top: 10, right: 10, bottom: 20, left: 40 };
 
                     const x = d3.scaleLinear().domain([0, 4]).range([margin.left, width - margin.right]);
                     const y = d3.scaleLinear().domain([0, goalData[i] * 1.2]).range([height - margin.bottom, margin.top]);
@@ -200,7 +201,7 @@
                         .y(d => y(d))
                         .curve(d3.curveMonotoneX);
 
-                    const pathData = [0, salesData[i] / 2, salesData[i]]; // Simulated trend
+                    const pathData = [0, salesData[i] / 2, salesData[i]];
                     const path = svg.append('path')
                         .datum(pathData)
                         .attr('fill', 'none')
@@ -217,7 +218,7 @@
                         .attr('stroke-dashoffset', 0);
                 });
             }
-            updateCharts(); // Initial render
+            updateCharts();
 
             // Particle Explosion for Goal Hit
             function explodePlanet(planet) {
@@ -289,9 +290,9 @@
                         const percentage = planet.userData.sales / planet.userData.goal * 100;
                         if (percentage >= 100) {
                             explodePlanet(planet);
-                            confetti({ particleCount: 30000, spread: 10000 });
+                            confetti({ particleCount: 50000, spread: 10000 });
                         } else {
-                            gsap.to(rings[chartLabels.indexOf(planet.userData.name)], {
+                            gsap.to(rings[planet.userData.index], {
                                 scale: { x: 1.2, y: 1.2, z: 1 },
                                 duration: 0.5,
                                 yoyo: true,
@@ -346,6 +347,8 @@
                     salesData[2] = salesSummary['MCISAM'] || 0;
                     salesData[3] = salesSummary['ENCMIG'] || 0;
 
+                    console.log('Sales Data:', salesData); // Debug log
+
                     // Update Visuals
                     planets.forEach((planet, i) => {
                         planet.userData.sales = salesData[i];
@@ -353,6 +356,7 @@
                         planet.material.color.set(percentage >= 100 ? 0x00ff00 : percentage >= 75 ? 0xffff00 : 0xff0000);
                         gsap.to(rings[i].scale, { x: percentage / 100, y: percentage / 100, z: 1, duration: 1 });
                         if (percentage >= 100) confetti({ particleCount: 100, spread: 70 });
+                        console.log(`Planet ${planet.userData.name}: Sales=${salesData[i]}, Goal=${goalData[i]}, Percentage=${percentage}%`); // Debug log
                     });
                     updateCharts();
                 };
