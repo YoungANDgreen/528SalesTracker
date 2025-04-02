@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sales Galaxy Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-    <!-- Updated Three.js CDN with fallback -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
@@ -20,9 +19,10 @@
             overflow: hidden;
         }
         #scene-container {
-            width: 100vw;
+            width: 75vw;
             height: 100vh;
-            position: relative;
+            position: absolute;
+            left: 0;
         }
         #fileInput {
             position: absolute;
@@ -45,21 +45,28 @@
             z-index: 20;
             display: none;
         }
-        #chart-container {
+        #charts-sidebar {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 400px;
-            height: 300px;
+            right: 0;
+            top: 0;
+            width: 25vw;
+            height: 100vh;
             background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
             padding: 20px;
-            display: none;
+            overflow-y: auto;
             z-index: 10;
         }
-        svg {
+        .chart-box {
+            margin-bottom: 20px;
+        }
+        .chart-box h3 {
+            margin: 0 0 10px;
+            color: #00d4ff;
+            font-size: 1.2em;
+        }
+        .chart-box svg {
             width: 100%;
-            height: 100%;
+            height: 150px;
         }
     </style>
 </head>
@@ -67,12 +74,9 @@
     <input type="file" id="fileInput" accept=".txt" />
     <div id="scene-container"></div>
     <div id="tooltip"></div>
-    <div id="chart-container">
-        <svg id="detail-chart"></svg>
-    </div>
+    <div id="charts-sidebar"></div>
 
     <script>
-        // Check if THREE is loaded, fallback if not
         if (typeof THREE === 'undefined') {
             console.error('Three.js failed to load. Attempting fallback...');
             const script = document.createElement('script');
@@ -98,9 +102,9 @@
 
             // Three.js Setup
             const scene = new THREE.Scene();
-            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth * 0.75 / window.innerHeight, 0.1, 1000);
             const renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setSize(window.innerWidth * 0.75, window.innerHeight);
             document.getElementById('scene-container').appendChild(renderer.domElement);
 
             // Background Stars
@@ -170,13 +174,87 @@
             }
             animate();
 
+            // Persistent Charts
+            function updateCharts() {
+                const sidebar = d3.select('#charts-sidebar').html('');
+                chartLabels.forEach((name, i) => {
+                    const chartBox = sidebar.append('div').attr('class', 'chart-box');
+                    chartBox.append('h3').text(name);
+                    const svg = chartBox.append('svg').attr('id', `chart-${name}`);
+                    const width = 200;
+                    const height = 150;
+                    const margin = { top: 10, right: 10, bottom: 20, left: 40 };
+
+                    const x = d3.scaleLinear().domain([0, 4]).range([margin.left, width - margin.right]);
+                    const y = d3.scaleLinear().domain([0, goalData[i] * 1.2]).range([height - margin.bottom, margin.top]);
+
+                    svg.append('g')
+                        .attr('transform', `translate(0,${height - margin.bottom})`)
+                        .call(d3.axisBottom(x).ticks(5));
+                    svg.append('g')
+                        .attr('transform', `translate(${margin.left},0)`)
+                        .call(d3.axisLeft(y).tickFormat(d => `$${d / 1000}k`));
+
+                    const line = d3.line()
+                        .x((d, i) => x(i))
+                        .y(d => y(d))
+                        .curve(d3.curveMonotoneX);
+
+                    const pathData = [0, salesData[i] / 2, salesData[i]]; // Simulated trend
+                    const path = svg.append('path')
+                        .datum(pathData)
+                        .attr('fill', 'none')
+                        .attr('stroke', '#ff007a')
+                        .attr('stroke-width', 2)
+                        .attr('d', line);
+
+                    const totalLength = path.node().getTotalLength();
+                    path.attr('stroke-dasharray', `${totalLength} ${totalLength}`)
+                        .attr('stroke-dashoffset', totalLength)
+                        .transition()
+                        .duration(1000)
+                        .ease(d3.easeLinear)
+                        .attr('stroke-dashoffset', 0);
+                });
+            }
+            updateCharts(); // Initial render
+
+            // Particle Explosion for Goal Hit
+            function explodePlanet(planet) {
+                const particleGeometry = new THREE.BufferGeometry();
+                const particleMaterial = new THREE.PointsMaterial({ color: 0xffff00, size: 0.5 });
+                const particleVertices = [];
+                for (let i = 0; i < 200; i++) {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
+                    const r = Math.random() * 5;
+                    particleVertices.push(
+                        planet.position.x + r * Math.sin(phi) * Math.cos(theta),
+                        planet.position.y + r * Math.sin(phi) * Math.sin(theta),
+                        planet.position.z + r * Math.cos(phi)
+                    );
+                }
+                particleGeometry.setAttribute('position', new THREE.Float32BufferAttribute(particleVertices, 3));
+                const particles = new THREE.Points(particleGeometry, particleMaterial);
+                scene.add(particles);
+
+                gsap.to(particles.position, {
+                    x: '+=10',
+                    y: '+=10',
+                    z: '+=10',
+                    duration: 2,
+                    onComplete: () => scene.remove(particles)
+                });
+                gsap.to(particles.material, { opacity: 0, duration: 2 });
+            }
+
             // Raycaster for Interactivity
             const raycaster = new THREE.Raycaster();
             const mouse = new THREE.Vector2();
             let selectedPlanet = null;
 
             window.addEventListener('mousemove', (event) => {
-                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.x = (event.clientX / (window.innerWidth * 0.75)) * 2 - 1;
                 mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
                 raycaster.setFromCamera(mouse, camera);
                 const intersects = raycaster.intersectObjects(planets);
@@ -198,7 +276,7 @@
             });
 
             window.addEventListener('click', (event) => {
-                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.x = (event.clientX / (window.innerWidth * 0.75)) * 2 - 1;
                 mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
                 raycaster.setFromCamera(mouse, camera);
                 const intersects = raycaster.intersectObjects(planets);
@@ -208,51 +286,21 @@
                         selectedPlanet = planet;
                         gsap.to(planet.scale, { x: 2.5, y: 2.5, z: 2.5, duration: 0.5 });
                         planets.forEach(p => { if (p !== planet) gsap.to(p.scale, { x: 1, y: 1, z: 1, duration: 0.5 }); });
-                        showDetailChart(planet.userData);
+                        const percentage = planet.userData.sales / planet.userData.goal * 100;
+                        if (percentage >= 100) {
+                            explodePlanet(planet);
+                            confetti({ particleCount: 200, spread: 100 });
+                        } else {
+                            gsap.to(rings[chartLabels.indexOf(planet.userData.name)], {
+                                scale: { x: 1.2, y: 1.2, z: 1 },
+                                duration: 0.5,
+                                yoyo: true,
+                                repeat: 1
+                            });
+                        }
                     }
                 }
             });
-
-            // Detailed Chart with D3.js
-            function showDetailChart(data) {
-                const chartContainer = document.getElementById('chart-container');
-                chartContainer.style.display = 'block';
-                const svg = d3.select('#detail-chart').html('');
-                const width = 360;
-                const height = 260;
-                const margin = { top: 20, right: 20, bottom: 30, left: 50 };
-
-                const x = d3.scaleLinear().domain([0, 4]).range([margin.left, width - margin.right]);
-                const y = d3.scaleLinear().domain([0, data.goal * 1.2]).range([height - margin.bottom, margin.top]);
-
-                svg.append('g')
-                    .attr('transform', `translate(0,${height - margin.bottom})`)
-                    .call(d3.axisBottom(x).ticks(5));
-                svg.append('g')
-                    .attr('transform', `translate(${margin.left},0)`)
-                    .call(d3.axisLeft(y).tickFormat(d => `$${d / 1000}k`));
-
-                const line = d3.line()
-                    .x((d, i) => x(i))
-                    .y(d => y(d))
-                    .curve(d3.curveMonotoneX);
-
-                const pathData = [0, data.sales / 2, data.sales]; // Simulated trend
-                const path = svg.append('path')
-                    .datum(pathData)
-                    .attr('fill', 'none')
-                    .attr('stroke', '#ff007a')
-                    .attr('stroke-width', 2)
-                    .attr('d', line);
-
-                const totalLength = path.node().getTotalLength();
-                path.attr('stroke-dasharray', `${totalLength} ${totalLength}`)
-                    .attr('stroke-dashoffset', totalLength)
-                    .transition()
-                    .duration(1000)
-                    .ease(d3.easeLinear)
-                    .attr('stroke-dashoffset', 0);
-            }
 
             // File Upload Handler
             document.getElementById('fileInput').addEventListener('change', function (event) {
@@ -306,15 +354,16 @@
                         gsap.to(rings[i].scale, { x: percentage / 100, y: percentage / 100, z: 1, duration: 1 });
                         if (percentage >= 100) confetti({ particleCount: 100, spread: 70 });
                     });
+                    updateCharts();
                 };
                 reader.readAsText(file);
             });
 
             // Resize Handler
             window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.aspect = (window.innerWidth * 0.75) / window.innerHeight;
                 camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setSize(window.innerWidth * 0.75, window.innerHeight);
             });
         }
     </script>
