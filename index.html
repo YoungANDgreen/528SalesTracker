@@ -66,7 +66,7 @@
         }
         .chart-box svg {
             width: 100%;
-            height: 200px;
+            height: 300px;
         }
     </style>
 </head>
@@ -139,10 +139,10 @@
             const planets = [];
             const rings = [];
             const positions = [
-                { x: -20, y: 10, z: -20 }, // LOCSEA
-                { x: 20, y: 5, z: -15 },  // ROBTAY
-                { x: -15, y: -5, z: -25 }, // MCISAM
-                { x: 15, y: -10, z: -30 }  // ENCMIG
+                { x: -40, y: 15, z: -20 }, // LOCSEA
+                { x: 40, y: 5, z: -15 },  // ROBTAY
+                { x: -35, y: -5, z: -25 }, // MCISAM
+                { x: 35, y: -15, z: -30 }  // ENCMIG
             ];
             const colors = [0x00ff00, 0xffff00, 0xff00ff, 0x00ffff]; // Unique colors
             chartLabels.forEach((name, index) => {
@@ -155,7 +155,7 @@
                 scene.add(planet);
                 planets.push(planet);
 
-                const ringGeometry = new THREE.TorusGeometry(5, 0.2, 20, 100);
+                const ringGeometry = new THREE.TorusGeometry(12, 0.2, 20, 100);
                 const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xff007a, side: THREE.DoubleSide });
                 const ring = new THREE.Mesh(ringGeometry, ringMaterial);
                 ring.rotation.x = Math.PI / 2;
