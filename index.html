@@ -96,7 +96,7 @@
             };
 
             const chartLabels = Object.keys(salesGoals);
-            const salesData = [0, 0, 0, 0];
+            const salesData = [0, 0, 0, 0, 0];
             const goalData = Object.values(salesGoals);
             const totalGoal = goalData.reduce((sum, val) => sum + val, 0);
 
@@ -287,7 +287,7 @@
                         gsap.to(planet.scale, { x: 2.5, y: 2.5, z: 2.5, duration: 0.5 });
                         planets.forEach(p => { if (p !== planet) gsap.to(p.scale, { x: 1, y: 1, z: 1, duration: 0.5 }); });
                         const percentage = planet.userData.sales / planet.userData.goal * 100;
-                        if (percentage >= 50) {
+                        if (percentage >= 50 && < 100) {
                             explodePlanet(planet);
                             confetti({ particleCount: 5000, spread: 1000 });
                         } else if (percentage >= 100) {
