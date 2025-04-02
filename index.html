@@ -287,9 +287,12 @@
                         gsap.to(planet.scale, { x: 2.5, y: 2.5, z: 2.5, duration: 0.5 });
                         planets.forEach(p => { if (p !== planet) gsap.to(p.scale, { x: 1, y: 1, z: 1, duration: 0.5 }); });
                         const percentage = planet.userData.sales / planet.userData.goal * 100;
-                        if (percentage >= 50 or 100) {
+                        if (percentage >= 50) {
                             explodePlanet(planet);
                             confetti({ particleCount: 200, spread: 100 });
+                        } else if (percentage >= 100) {
+                            explodePlanet(planet);
+                            confetti({ particleCount: 2000, spread: 200 });
                         } else {
                             gsap.to(rings[chartLabels.indexOf(planet.userData.name)], {
                                 scale: { x: 1.2, y: 1.2, z: 1 },
