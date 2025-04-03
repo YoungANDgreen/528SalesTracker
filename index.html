@@ -198,40 +198,88 @@
             }
             animate();
 
-            // Persistent Charts
+            // Persistent Charts with Timescale
             function updateCharts() {
                 const sidebar = d3.select('#charts-sidebar').html('');
+                
+                // Define the date range
+                const startDate = new Date("2025-04-01");
+                const endDate = new Date("2025-06-30");
+                const currentDate = new Date(); // Today's date
+                
+                // Ensure current date is within our range
+                const chartCurrentDate = new Date(Math.min(
+                    Math.max(currentDate.getTime(), startDate.getTime()),
+                    endDate.getTime()
+                ));
+                
+                // Calculate days elapsed and total days in the period
+                const totalDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+                const elapsedDays = (chartCurrentDate - startDate) / (1000 * 60 * 60 * 24);
+                const progressPercent = elapsedDays / totalDays;
+                
                 chartLabels.forEach((name, i) => {
                     const chartBox = sidebar.append('div').attr('class', 'chart-box');
                     chartBox.append('h3').text(name);
                     const svg = chartBox.append('svg').attr('id', `chart-${name}`);
-                    const width = 300;
+                    
+                    const width = parseInt(svg.style('width')) || 300;
                     const height = 250;
-                    const margin = { top: 10, right: 10, bottom: 15, left: 40 };
-
-                    const x = d3.scaleLinear(["red", "blue"]).domain([0, 12]).range([margin.left, width - margin.right]);
-                    const y = d3.scaleLinear().domain([0, goalData[i] * 1.2]).range([height - margin.bottom, margin.top]);
-
+                    const margin = { top: 20, right: 30, bottom: 30, left: 50 };
+                    
+                    // Create scales
+                    const x = d3.scaleTime()
+                        .domain([startDate, endDate])
+                        .range([margin.left, width - margin.right]);
+                    
+                    const y = d3.scaleLinear()
+                        .domain([0, goalData[i] * 1.2]) // 20% headroom
+                        .range([height - margin.bottom, margin.top]);
+                    
+                    // Add the axes
                     svg.append('g')
                         .attr('transform', `translate(0,${height - margin.bottom})`)
-                        .call(d3.axisBottom(x).ticks(5));
+                        .call(d3.axisBottom(x).ticks(5).tickFormat(d3.timeFormat("%b %d")));
+                    
                     svg.append('g')
                         .attr('transform', `translate(${margin.left},0)`)
                         .call(d3.axisLeft(y).tickFormat(d => `$${d / 1000}k`));
-
-                    const line = d3.line()
-                        .x((d, i) => x(i))
-                        .y(d => y(d))
-                        .curve(d3.curveMonotoneX);
-
-                    const pathData = [0, salesData[i] / 2, salesData[i]];
-                    const path = svg.append('path')
-                        .datum(pathData)
+                    
+                    // Goal line (blue) - linear progression from 0 to goal
+                    const goalLine = d3.line()
+                        .x(d => x(d.date))
+                        .y(d => y(d.value));
+                    
+                    const goalLineData = [
+                        { date: startDate, value: 0 },
+                        { date: endDate, value: goalData[i] }
+                    ];
+                    
+                    svg.append('path')
+                        .datum(goalLineData)
                         .attr('fill', 'none')
-                        .attr('stroke', '#ff007a')
+                        .attr('stroke', '#0066ff') // Blue
                         .attr('stroke-width', 2)
-                        .attr('d', line);
-
+                        .attr('d', goalLine);
+                    
+                    // Actual sales line (red)
+                    const salesLine = d3.line()
+                        .x(d => x(d.date))
+                        .y(d => y(d.value));
+                    
+                    const salesLineData = [
+                        { date: startDate, value: 0 },
+                        { date: chartCurrentDate, value: salesData[i] }
+                    ];
+                    
+                    const path = svg.append('path')
+                        .datum(salesLineData)
+                        .attr('fill', 'none')
+                        .attr('stroke', '#ff007a') // Red
+                        .attr('stroke-width', 2)
+                        .attr('d', salesLine);
+                    
+                    // Animate the path drawing
                     const totalLength = path.node().getTotalLength();
                     path.attr('stroke-dasharray', `${totalLength} ${totalLength}`)
                         .attr('stroke-dashoffset', totalLength)
@@ -239,6 +287,40 @@
                         .duration(1000)
                         .ease(d3.easeLinear)
                         .attr('stroke-dashoffset', 0);
+                    
+                    // Add today's date marker
+                    svg.append('line')
+                        .attr('x1', x(chartCurrentDate))
+                        .attr('y1', y(0))
+                        .attr('x2', x(chartCurrentDate))
+                        .attr('y2', y(goalData[i] * 1.2))
+                        .attr('stroke', '#ffffff')
+                        .attr('stroke-width', 1)
+                        .attr('stroke-dasharray', '3,3');
+                    
+                    // Add current sales and target labels
+                    svg.append('text')
+                        .attr('x', margin.left + 5)
+                        .attr('y', margin.top + 15)
+                        .attr('fill', '#ff007a')
+                        .text(`Current: $${salesData[i].toLocaleString()}`);
+                    
+                    svg.append('text')
+                        .attr('x', margin.left + 5)
+                        .attr('y', margin.top + 35)
+                        .attr('fill', '#0066ff')
+                        .text(`Goal: $${goalData[i].toLocaleString()}`);
+                    
+                    // Add expected vs actual indicator
+                    const expectedSales = goalData[i] * progressPercent;
+                    const salesDifference = salesData[i] - expectedSales;
+                    const status = salesDifference >= 0 ? 'ahead' : 'behind';
+                    
+                    svg.append('text')
+                        .attr('x', margin.left + 5)
+                        .attr('y', margin.top + 55)
+                        .attr('fill', salesDifference >= 0 ? '#00ff00' : '#ff0000')
+                        .text(`${status}: $${Math.abs(salesDifference).toLocaleString()}`);
                 });
             }
             updateCharts();
