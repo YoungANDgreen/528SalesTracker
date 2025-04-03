@@ -51,7 +51,7 @@
             width: 25vw;
             height: 100vh;
             background: rgba(255, 255, 255, 0.05);
-            padding: 20px;
+            padding: 0px;
             overflow-y: auto;
             z-index: 10;
         }
@@ -997,13 +997,13 @@
                     
                     // Add current sales and target labels
                     svg.append('text')
-                        .attr('x', margin.left + 5)
+                        .attr('x', margin.left + 50)
                         .attr('y', margin.top + 15)
                         .attr('fill', '#ff007a')
                         .text(`Current: $${salesData[i].toLocaleString()}`);
                     
                     svg.append('text')
-                        .attr('x', margin.left + 5)
+                        .attr('x', margin.left + 50)
                         .attr('y', margin.top + 35)
                         .attr('fill', '#0066ff')
                         .text(`Goal: $${goalData[i].toLocaleString()}`);
@@ -1014,7 +1014,7 @@
                     const status = salesDifference >= 0 ? 'ahead' : 'behind';
                     
                     svg.append('text')
-                        .attr('x', margin.left + 5)
+                        .attr('x', margin.left + 50)
                         .attr('y', margin.top + 55)
                         .attr('fill', salesDifference >= 0 ? '#00ff00' : '#ff0000')
                         .text(`${status}: $${Math.abs(salesDifference).toLocaleString()}`);
