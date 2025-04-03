@@ -26,122 +26,144 @@
             });
 
             window.addEventListener('click', (event) => {
+                // Calculate mouse position for raycasting
                 mouse.x = (event.clientX / (window.innerWidth * 0.75)) * 2 - 1;
                 mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Set up raycaster
                 raycaster.setFromCamera(mouse, camera);
-                const intersects = raycaster.intersectObjects(planets);
+                const intersects = raycaster.intersectObjects(planets, true);
+                
                 if (intersects.length > 0) {
-                    const planet = intersects[0].object;
-                    const planetGroup = planetGroups[planet.userData.index];
+                    // Find the planet by traversing up to find object with userData
+                    let currentObj = intersects[0].object;
+                    let found = false;
                     
-                    if (selectedPlanetGroup !== planetGroup) {
-                        selectedPlanetGroup = planetGroup;
+                    // Try to find parent object with userData containing sales data
+                    while (currentObj && !found) {
+                        if (currentObj.userData && currentObj.userData.sales !== undefined) {
+                            found = true;
+                        } else if (currentObj.parent) {
+                            currentObj = currentObj.parent;
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    // If we found an object with sales data
+                    if (found && currentObj.userData) {
+                        const planet = currentObj;
+                        const planetGroup = planetGroups[planet.userData.index];
                         
-                        // Highlight selected sun system
-                        gsap.to(planetGroup.scale, { x: 1.2, y: 1.2, z: 1.2, duration: 0.5 });
-                        
-                        // Move camera to focus on this planet
-                        gsap.to(camera.position, {
-                            x: planetGroup.position.x * 0.5,
-                            y: planetGroup.position.y * 0.5,
-                            z: 60,
-                            duration: 1,
-                            onUpdate: () => {
-                                camera.lookAt(planetGroup.position);
-                            }
-                        });
-                        
-                        // Dim other planet systems
-                        planetGroups.forEach(pg => {
-                            if (pg !== planetGroup) {
-                                gsap.to(pg.scale, { x: 0.7, y: 0.7, z: 0.7, duration: 0.5 });
-                                // Reduce opacity of other planets
-                                pg.traverse(child => {
-                                    if (child.material && child.material.opacity !== undefined) {
-                                        gsap.to(child.material, { opacity: 0.3, duration: 0.5 });
+                        if (selectedPlanetGroup !== planetGroup) {
+                            selectedPlanetGroup = planetGroup;
+                            
+                            // Highlight selected sun system
+                            gsap.to(planetGroup.scale, { x: 1.2, y: 1.2, z: 1.2, duration: 0.5 });
+                            
+                            // Move camera to focus on this planet
+                            gsap.to(camera.position, {
+                                x: planetGroup.position.x * 0.5,
+                                y: planetGroup.position.y * 0.5,
+                                z: 60,
+                                duration: 1,
+                                onUpdate: () => {
+                                    camera.lookAt(planetGroup.position);
+                                }
+                            });
+                            
+                            // Dim other planet systems
+                            planetGroups.forEach(pg => {
+                                if (pg !== planetGroup) {
+                                    gsap.to(pg.scale, { x: 0.7, y: 0.7, z: 0.7, duration: 0.5 });
+                                    // Reduce opacity of other planets
+                                    pg.traverse(child => {
+                                        if (child.material && child.material.opacity !== undefined) {
+                                            gsap.to(child.material, { opacity: 0.3, duration: 0.5 });
+                                        }
+                                    });
+                                } else {
+                                    // Restore opacity for selected planet
+                                    pg.traverse(child => {
+                                        if (child.material && child.material.opacity !== undefined) {
+                                            gsap.to(child.material, { opacity: 1.0, duration: 0.5 });
+                                        }
+                                    });
+                                }
+                            });
+                            
+                            const percentage = planet.userData.sales / planet.userData.goal * 100;
+                            if (percentage >= 100) {
+                                explodePlanet(planetGroup);
+                            } else {
+                                // Pulse effect on the ring
+                                const ring = rings[planet.userData.index];
+                                gsap.to(ring.scale, { 
+                                    x: 1.2, 
+                                    y: 1.2, 
+                                    z: 1, 
+                                    duration: 0.5, 
+                                    yoyo: true, 
+                                    repeat: 1 
+                                });
+                                
+                                // Pulse effect on the sun
+                                planetGroup.children.forEach(child => {
+                                    if (child.material && child.material.uniforms && child.material.uniforms.time) {
+                                        // Boost any shader parameters temporarily
+                                        if (child.userData.originalScale) {
+                                            gsap.to(child.scale, {
+                                                x: child.userData.originalScale.x * 1.2,
+                                                y: child.userData.originalScale.y * 1.2,
+                                                z: child.userData.originalScale.z * 1.2,
+                                                duration: 0.5,
+                                                yoyo: true,
+                                                repeat: 1
+                                            });
+                                        } else {
+                                            child.userData.originalScale = {
+                                                x: child.scale.x,
+                                                y: child.scale.y,
+                                                z: child.scale.z
+                                            };
+                                            gsap.to(child.scale, {
+                                                x: child.scale.x * 1.2,
+                                                y: child.scale.y * 1.2,
+                                                z: child.scale.z * 1.2,
+                                                duration: 0.5,
+                                                yoyo: true,
+                                                repeat: 1
+                                            });
+                                        }
                                     }
                                 });
-                            } else {
-                                // Restore opacity for selected planet
+                            }
+                        } else {
+                            // When clicking the same planet again, reset view
+                            selectedPlanetGroup = null;
+                            
+                            // Reset camera position
+                            gsap.to(camera.position, {
+                                x: 0,
+                                y: 20,
+                                z: 60,
+                                duration: 1,
+                                onUpdate: () => {
+                                    camera.lookAt(0, 0, 0);
+                                }
+                            });
+                            
+                            // Reset all planet systems
+                            planetGroups.forEach(pg => {
+                                gsap.to(pg.scale, { x: 1, y: 1, z: 1, duration: 0.5 });
+                                // Restore opacity
                                 pg.traverse(child => {
                                     if (child.material && child.material.opacity !== undefined) {
                                         gsap.to(child.material, { opacity: 1.0, duration: 0.5 });
                                     }
                                 });
-                            }
-                        });
-                        
-                        const percentage = planet.userData.sales / planet.userData.goal * 100;
-                        if (percentage >= 100) {
-                            explodePlanet(planetGroup);
-                        } else {
-                            // Pulse effect on the ring
-                            const ring = rings[planet.userData.index];
-                            gsap.to(ring.scale, { 
-                                x: 1.2, 
-                                y: 1.2, 
-                                z: 1, 
-                                duration: 0.5, 
-                                yoyo: true, 
-                                repeat: 1 
-                            });
-                            
-                            // Pulse effect on the sun
-                            planetGroup.children.forEach(child => {
-                                if (child.material && child.material.uniforms && child.material.uniforms.time) {
-                                    // Boost any shader parameters temporarily
-                                    if (child.userData.originalScale) {
-                                        gsap.to(child.scale, {
-                                            x: child.userData.originalScale.x * 1.2,
-                                            y: child.userData.originalScale.y * 1.2,
-                                            z: child.userData.originalScale.z * 1.2,
-                                            duration: 0.5,
-                                            yoyo: true,
-                                            repeat: 1
-                                        });
-                                    } else {
-                                        child.userData.originalScale = {
-                                            x: child.scale.x,
-                                            y: child.scale.y,
-                                            z: child.scale.z
-                                        };
-                                        gsap.to(child.scale, {
-                                            x: child.scale.x * 1.2,
-                                            y: child.scale.y * 1.2,
-                                            z: child.scale.z * 1.2,
-                                            duration: 0.5,
-                                            yoyo: true,
-                                            repeat: 1
-                                        });
-                                    }
-                                }
                             });
                         }
-                    } else {
-                        // When clicking the same planet again, reset view
-                        selectedPlanetGroup = null;
-                        
-                        // Reset camera position
-                        gsap.to(camera.position, {
-                            x: 0,
-                            y: 20,
-                            z: 60,
-                            duration: 1,
-                            onUpdate: () => {
-                                camera.lookAt(0, 0, 0);
-                            }
-                        });
-                        
-                        // Reset all planet systems
-                        planetGroups.forEach(pg => {
-                            gsap.to(pg.scale, { x: 1, y: 1, z: 1, duration: 0.5 });
-                            // Restore opacity
-                            pg.traverse(child => {
-                                if (child.material && child.material.opacity !== undefined) {
-                                    gsap.to(child.material, { opacity: 1.0, duration: 0.5 });
-                                }
-                            });
-                        });
                     }
                 }
             });<!DOCTYPE html>
@@ -212,6 +234,10 @@
         .chart-box svg {
             width: 100%;
             height: 260px;
+        }
+        /* Hide any debug text */
+        .debug-text {
+            display: none !important;
         }
     </style>
 </head>
@@ -1368,22 +1394,47 @@
             let selectedPlanet = null;
 
             window.addEventListener('mousemove', (event) => {
+                // Calculate mouse position for raycasting
                 mouse.x = (event.clientX / (window.innerWidth * 0.75)) * 2 - 1;
                 mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Set up raycaster
                 raycaster.setFromCamera(mouse, camera);
-                const intersects = raycaster.intersectObjects(planets);
+                const intersects = raycaster.intersectObjects(planets, true);
                 const tooltip = document.getElementById('tooltip');
+                
+                // If an intersection is found, show tooltip
                 if (intersects.length > 0) {
-                    const planet = intersects[0].object;
-                    tooltip.style.display = 'block';
-                    tooltip.style.left = `${event.clientX + 10}px`;
-                    tooltip.style.top = `${event.clientY + 10}px`;
-                    tooltip.innerHTML = `
-                        <strong>${planet.userData.name}</strong><br>
-                        Sales: $${planet.userData.sales.toLocaleString()}<br>
-                        Goal: $${planet.userData.goal.toLocaleString()}<br>
-                        Progress: ${(planet.userData.sales / planet.userData.goal * 100).toFixed(1)}%
-                    `;
+                    // Find the planet by traversing up to find object with userData
+                    let currentObj = intersects[0].object;
+                    let found = false;
+                    
+                    // Try to find parent object with userData containing sales data
+                    while (currentObj && !found) {
+                        if (currentObj.userData && currentObj.userData.sales !== undefined) {
+                            found = true;
+                        } else if (currentObj.parent) {
+                            currentObj = currentObj.parent;
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    // If we found an object with sales data
+                    if (found && currentObj.userData) {
+                        const planet = currentObj;
+                        tooltip.style.display = 'block';
+                        tooltip.style.left = `${event.clientX + 10}px`;
+                        tooltip.style.top = `${event.clientY + 10}px`;
+                        tooltip.innerHTML = `
+                            <strong>${planet.userData.name}</strong><br>
+                            Sales: ${planet.userData.sales.toLocaleString()}<br>
+                            Goal: ${planet.userData.goal.toLocaleString()}<br>
+                            Progress: ${(planet.userData.sales / planet.userData.goal * 100).toFixed(1)}%
+                        `;
+                    } else {
+                        tooltip.style.display = 'none';
+                    }
                 } else {
                     tooltip.style.display = 'none';
                 }
