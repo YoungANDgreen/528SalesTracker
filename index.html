@@ -208,7 +208,7 @@
                     const height = 250;
                     const margin = { top: 10, right: 10, bottom: 15, left: 40 };
 
-                    const x = d3.scaleLinear().domain([0, 4]).range([margin.left, width - margin.right]);
+                    const x = d3.scaleLinear().domain([0, 12]).range([margin.left, width - margin.right]);
                     const y = d3.scaleLinear().domain([0, goalData[i] * 1.2]).range([height - margin.bottom, margin.top]);
 
                     svg.append('g')
