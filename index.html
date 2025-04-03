@@ -1282,7 +1282,7 @@
                     if (selectedPlanet !== planet) {
                         selectedPlanet = planet;
                         gsap.to(planet.scale, { x: 35, y: 35, z: 4, duration: 0.5 });
-                        planets.forEach(p => { if (p !== planet) gsap.to(p.scale, { x: 10, y: 10, z: 1, duration: 0.5 }); });
+                        planets.forEach(p => { if (p !== planet) gsap.to(p.scale, { x: 2, y: 2, z: 1, duration: 0.5 }); });
                         const percentage = planet.userData.sales / planet.userData.goal * 100;
                         if (percentage >= 100) {
                             explodePlanet(planet);
