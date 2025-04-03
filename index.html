@@ -1,4 +1,150 @@
-<!DOCTYPE html>
+// Raycaster for Interactivity
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            let selectedPlanetGroup = null;
+
+            window.addEventListener('mousemove', (event) => {
+                mouse.x = (event.clientX / (window.innerWidth * 0.75)) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(planets);
+                const tooltip = document.getElementById('tooltip');
+                if (intersects.length > 0) {
+                    const planet = intersects[0].object;
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = `${event.clientX + 10}px`;
+                    tooltip.style.top = `${event.clientY + 10}px`;
+                    tooltip.innerHTML = `
+                        <strong>${planet.userData.name}</strong><br>
+                        Sales: ${planet.userData.sales.toLocaleString()}<br>
+                        Goal: ${planet.userData.goal.toLocaleString()}<br>
+                        Progress: ${(planet.userData.sales / planet.userData.goal * 100).toFixed(1)}%
+                    `;
+                } else {
+                    tooltip.style.display = 'none';
+                }
+            });
+
+            window.addEventListener('click', (event) => {
+                mouse.x = (event.clientX / (window.innerWidth * 0.75)) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(planets);
+                if (intersects.length > 0) {
+                    const planet = intersects[0].object;
+                    const planetGroup = planetGroups[planet.userData.index];
+                    
+                    if (selectedPlanetGroup !== planetGroup) {
+                        selectedPlanetGroup = planetGroup;
+                        
+                        // Highlight selected sun system
+                        gsap.to(planetGroup.scale, { x: 1.2, y: 1.2, z: 1.2, duration: 0.5 });
+                        
+                        // Move camera to focus on this planet
+                        gsap.to(camera.position, {
+                            x: planetGroup.position.x * 0.5,
+                            y: planetGroup.position.y * 0.5,
+                            z: 60,
+                            duration: 1,
+                            onUpdate: () => {
+                                camera.lookAt(planetGroup.position);
+                            }
+                        });
+                        
+                        // Dim other planet systems
+                        planetGroups.forEach(pg => {
+                            if (pg !== planetGroup) {
+                                gsap.to(pg.scale, { x: 0.7, y: 0.7, z: 0.7, duration: 0.5 });
+                                // Reduce opacity of other planets
+                                pg.traverse(child => {
+                                    if (child.material && child.material.opacity !== undefined) {
+                                        gsap.to(child.material, { opacity: 0.3, duration: 0.5 });
+                                    }
+                                });
+                            } else {
+                                // Restore opacity for selected planet
+                                pg.traverse(child => {
+                                    if (child.material && child.material.opacity !== undefined) {
+                                        gsap.to(child.material, { opacity: 1.0, duration: 0.5 });
+                                    }
+                                });
+                            }
+                        });
+                        
+                        const percentage = planet.userData.sales / planet.userData.goal * 100;
+                        if (percentage >= 100) {
+                            explodePlanet(planetGroup);
+                        } else {
+                            // Pulse effect on the ring
+                            const ring = rings[planet.userData.index];
+                            gsap.to(ring.scale, { 
+                                x: 1.2, 
+                                y: 1.2, 
+                                z: 1, 
+                                duration: 0.5, 
+                                yoyo: true, 
+                                repeat: 1 
+                            });
+                            
+                            // Pulse effect on the sun
+                            planetGroup.children.forEach(child => {
+                                if (child.material && child.material.uniforms && child.material.uniforms.time) {
+                                    // Boost any shader parameters temporarily
+                                    if (child.userData.originalScale) {
+                                        gsap.to(child.scale, {
+                                            x: child.userData.originalScale.x * 1.2,
+                                            y: child.userData.originalScale.y * 1.2,
+                                            z: child.userData.originalScale.z * 1.2,
+                                            duration: 0.5,
+                                            yoyo: true,
+                                            repeat: 1
+                                        });
+                                    } else {
+                                        child.userData.originalScale = {
+                                            x: child.scale.x,
+                                            y: child.scale.y,
+                                            z: child.scale.z
+                                        };
+                                        gsap.to(child.scale, {
+                                            x: child.scale.x * 1.2,
+                                            y: child.scale.y * 1.2,
+                                            z: child.scale.z * 1.2,
+                                            duration: 0.5,
+                                            yoyo: true,
+                                            repeat: 1
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                    } else {
+                        // When clicking the same planet again, reset view
+                        selectedPlanetGroup = null;
+                        
+                        // Reset camera position
+                        gsap.to(camera.position, {
+                            x: 0,
+                            y: 20,
+                            z: 60,
+                            duration: 1,
+                            onUpdate: () => {
+                                camera.lookAt(0, 0, 0);
+                            }
+                        });
+                        
+                        // Reset all planet systems
+                        planetGroups.forEach(pg => {
+                            gsap.to(pg.scale, { x: 1, y: 1, z: 1, duration: 0.5 });
+                            // Restore opacity
+                            pg.traverse(child => {
+                                if (child.material && child.material.opacity !== undefined) {
+                                    gsap.to(child.material, { opacity: 1.0, duration: 0.5 });
+                                }
+                            });
+                        });
+                    }
+                }
+            });<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -106,94 +252,783 @@
             renderer.setSize(window.innerWidth * 0.75, window.innerHeight);
             document.getElementById('scene-container').appendChild(renderer.domElement);
 
-            // Background Stars
+            // Enhanced Background Stars with variable sizes and colors
             const starGeometry = new THREE.BufferGeometry();
-            const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 });
+            const starCount = 15000;
             const starVertices = [];
-            for (let i = 0; i < 10000; i++) {
-                starVertices.push((Math.random() - 0.5) * 2000, (Math.random() - 0.5) * 2000, (Math.random() - 0.5) * 2000);
+            const starColors = [];
+            const starSizes = [];
+            
+            for (let i = 0; i < starCount; i++) {
+                // Position stars in a spherical distribution
+                const radius = 1000 + Math.random() * 1000; // Distribute from 1000 to 2000 units
+                const theta = Math.random() * Math.PI * 2; // Full circle in radians
+                const phi = Math.acos(2 * Math.random() - 1); // Distribution on sphere
+                
+                const x = radius * Math.sin(phi) * Math.cos(theta);
+                const y = radius * Math.sin(phi) * Math.sin(theta);
+                const z = radius * Math.cos(phi);
+                
+                starVertices.push(x, y, z);
+                
+                // Vary star colors between white, blue, yellow and red
+                const colorType = Math.random();
+                if (colorType < 0.6) {
+                    // White to slight blue (most stars)
+                    starColors.push(0.9, 0.95, 1);
+                } else if (colorType < 0.8) {
+                    // Yellow/orange stars
+                    starColors.push(1, 0.7 + Math.random() * 0.3, 0.2);
+                } else if (colorType < 0.95) {
+                    // Blue stars
+                    starColors.push(0.5, 0.7, 1);
+                } else {
+                    // Red stars
+                    starColors.push(1, 0.3, 0.3);
+                }
+                
+                // Vary star sizes, with most being small but a few larger ones
+                const sizeRand = Math.random();
+                if (sizeRand < 0.8) {
+                    starSizes.push(0.1 + Math.random() * 0.2); // Small stars
+                } else if (sizeRand < 0.95) {
+                    starSizes.push(0.3 + Math.random() * 0.3); // Medium stars
+                } else {
+                    starSizes.push(0.6 + Math.random() * 0.5); // Large stars
+                }
             }
+            
             starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            starGeometry.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
+            starGeometry.setAttribute('size', new THREE.Float32BufferAttribute(starSizes, 1));
+            
+            const starMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    pixelRatio: { value: window.devicePixelRatio }
+                },
+                vertexShader: `
+                    attribute float size;
+                    attribute vec3 color;
+                    uniform float time;
+                    uniform float pixelRatio;
+                    varying vec3 vColor;
+                    
+                    void main() {
+                        vColor = color;
+                        
+                        // Add subtle twinkling effect
+                        float twinkle = sin(time * 5.0 + position.x * 0.5 + position.y * 0.3 + position.z * 0.2) * 0.15 + 0.85;
+                        
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        gl_PointSize = size * twinkle * pixelRatio * (300.0 / -mvPosition.z);
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    
+                    void main() {
+                        // Create a soft circular point
+                        float r = length(gl_PointCoord - vec2(0.5, 0.5));
+                        if (r > 0.5) discard;
+                        
+                        // Add glow effect
+                        float intensity = 1.0 - r * 2.0;
+                        intensity = pow(intensity, 1.5);
+                        
+                        gl_FragColor = vec4(vColor * intensity, intensity);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthTest: false
+            });
+            
             const stars = new THREE.Points(starGeometry, starMaterial);
             scene.add(stars);
 
-            // Nebula
-            const nebulaGeometry = new THREE.BufferGeometry();
-            const nebulaMaterial = new THREE.PointsMaterial({ color: 0x00d4ff, size: 2, transparent: true, opacity: 0.3 });
-            const nebulaVertices = [];
-            for (let i = 0; i < 500; i++) {
-                nebulaVertices.push((Math.random() - 0.5) * 1000, (Math.random() - 0.5) * 1000, (Math.random() - 0.5) * 1000);
+            // Enhanced Nebula with volumetric cloud effect
+            const nebulaGroup = new THREE.Group();
+            const nebulaColors = [
+                new THREE.Color(0x0033ff), // Blue
+                new THREE.Color(0x990099), // Purple
+                new THREE.Color(0xff5500), // Orange
+                new THREE.Color(0x00ffcc)  // Teal
+            ];
+            
+            // Create multiple nebula clouds with different colors
+            for (let c = 0; c < nebulaColors.length; c++) {
+                const cloudCount = 8;
+                const particlesPerCloud = 2000;
+                
+                for (let i = 0; i < cloudCount; i++) {
+                    // Create a cloud centered around a random point
+                    const cloudCenter = new THREE.Vector3(
+                        (Math.random() - 0.5) * 600,
+                        (Math.random() - 0.5) * 600,
+                        (Math.random() - 0.5) * 600
+                    );
+                    
+                    const cloudSize = 50 + Math.random() * 150;
+                    const cloudGeometry = new THREE.BufferGeometry();
+                    const cloudVertices = [];
+                    const cloudColors = [];
+                    const cloudSizes = [];
+                    
+                    for (let j = 0; j < particlesPerCloud; j++) {
+                        // Gaussian distribution around center
+                        let x, y, z;
+                        const theta = Math.random() * Math.PI * 2;
+                        const phi = Math.acos(2 * Math.random() - 1);
+                        
+                        // Create gaussian distribution with Box-Muller transform
+                        const u = Math.random();
+                        const v = Math.random();
+                        const r = cloudSize * Math.sqrt(-2 * Math.log(u));
+                        
+                        x = cloudCenter.x + r * Math.cos(2 * Math.PI * v) * Math.sin(phi) * Math.cos(theta);
+                        y = cloudCenter.y + r * Math.sin(2 * Math.PI * v) * Math.sin(phi) * Math.sin(theta);
+                        z = cloudCenter.z + r * Math.sin(phi) * Math.cos(phi);
+                        
+                        cloudVertices.push(x, y, z);
+                        
+                        // Distance from center affects color intensity
+                        const distFromCenter = Math.sqrt(
+                            Math.pow(x - cloudCenter.x, 2) +
+                            Math.pow(y - cloudCenter.y, 2) +
+                            Math.pow(z - cloudCenter.z, 2)
+                        ) / cloudSize;
+                        
+                        const colorIntensity = Math.max(0, (1 - distFromCenter));
+                        const color = nebulaColors[c].clone();
+                        
+                        // Add some color variation
+                        color.r += (Math.random() - 0.5) * 0.2;
+                        color.g += (Math.random() - 0.5) * 0.2;
+                        color.b += (Math.random() - 0.5) * 0.2;
+                        
+                        cloudColors.push(color.r * colorIntensity, color.g * colorIntensity, color.b * colorIntensity);
+                        
+                        // Particles get smaller toward edges
+                        cloudSizes.push(2 + (1 - distFromCenter) * 4);
+                    }
+                    
+                    cloudGeometry.setAttribute('position', new THREE.Float32BufferAttribute(cloudVertices, 3));
+                    cloudGeometry.setAttribute('color', new THREE.Float32BufferAttribute(cloudColors, 3));
+                    cloudGeometry.setAttribute('size', new THREE.Float32BufferAttribute(cloudSizes, 1));
+                    
+                    const cloudMaterial = new THREE.ShaderMaterial({
+                        uniforms: {
+                            time: { value: 0 },
+                            pixelRatio: { value: window.devicePixelRatio }
+                        },
+                        vertexShader: `
+                            attribute float size;
+                            attribute vec3 color;
+                            uniform float time;
+                            uniform float pixelRatio;
+                            varying vec3 vColor;
+                            
+                            void main() {
+                                vColor = color;
+                                
+                                // Subtle movement
+                                vec3 pos = position;
+                                pos.x += sin(time * 0.1 + position.z * 0.01) * 2.0;
+                                pos.y += cos(time * 0.1 + position.x * 0.01) * 2.0;
+                                pos.z += sin(time * 0.1 + position.y * 0.01) * 2.0;
+                                
+                                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                                gl_PointSize = size * pixelRatio * (300.0 / -mvPosition.z);
+                                gl_Position = projectionMatrix * mvPosition;
+                            }
+                        `,
+                        fragmentShader: `
+                            varying vec3 vColor;
+                            
+                            void main() {
+                                // Soft circle
+                                float r = length(gl_PointCoord - vec2(0.5, 0.5));
+                                float alpha = smoothstep(0.5, 0.2, r);
+                                
+                                gl_FragColor = vec4(vColor, alpha * 0.6);
+                            }
+                        `,
+                        transparent: true,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    });
+                    
+                    const cloud = new THREE.Points(cloudGeometry, cloudMaterial);
+                    cloud.userData = { 
+                        rotationSpeed: (Math.random() - 0.5) * 0.001,
+                        cloudCenter: cloudCenter 
+                    };
+                    nebulaGroup.add(cloud);
+                }
             }
-            nebulaGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nebulaVertices, 3));
-            const nebula = new THREE.Points(nebulaGeometry, nebulaMaterial);
-            scene.add(nebula);
+            
+            scene.add(nebulaGroup);
+            const nebula = nebulaGroup; // For animation purposes
 
-            // Central Hub
-            const hubGeometry = new THREE.SphereGeometry(5, 32, 32);
-            const hubMaterial = new THREE.MeshBasicMaterial({ color: 0x00d4ff });
-            const hub = new THREE.Mesh(hubGeometry, hubMaterial);
-            scene.add(hub);
+            // Central Hub - Black Hole
+            const blackHoleRadius = 5;
+            
+            // Event horizon (black sphere)
+            const blackHoleGeometry = new THREE.SphereGeometry(blackHoleRadius, 64, 64);
+            const blackHoleMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x000000,
+                transparent: true,
+                opacity: 0.9
+            });
+            const blackHole = new THREE.Mesh(blackHoleGeometry, blackHoleMaterial);
+            scene.add(blackHole);
+            
+            // Accretion disk
+            const accretionDiskGeometry = new THREE.RingGeometry(blackHoleRadius * 1.2, blackHoleRadius * 3, 128);
+            const accretionDiskMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    innerColor: { value: new THREE.Color(0xff5500) },
+                    outerColor: { value: new THREE.Color(0x0088ff) },
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 innerColor;
+                    uniform vec3 outerColor;
+                    varying vec2 vUv;
+                    
+                    // Pseudo-random function
+                    float random(vec2 st) {
+                        return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+                    }
+                    
+                    void main() {
+                        float radial = vUv.y;
+                        float angle = vUv.x * 6.283185307179586;
+                        
+                        // Dynamic color mixing
+                        float colorMix = sin(radial * 5.0 + time * 0.5) * 0.5 + 0.5;
+                        vec3 color = mix(innerColor, outerColor, radial);
+                        
+                        // Add some variation/turbulence
+                        float turbulence = sin(angle * 8.0 + time * 2.0 + radial * 20.0) * 0.1 + 0.9;
+                        color *= turbulence;
+                        
+                        // Add brightness based on rotation
+                        float brightness = pow(sin(angle + time * 0.5) * 0.5 + 0.5, 3.0) * 1.5;
+                        color *= 0.5 + brightness;
+                        
+                        // Add some dust/stars
+                        float dust = step(0.98, random(vec2(angle + time * 0.1, radial + time * 0.05)));
+                        color += dust * 0.5;
+                        
+                        gl_FragColor = vec4(color, 1.0 - (radial * radial));
+                    }
+                `,
+                side: THREE.DoubleSide,
+                transparent: true,
+                blending: THREE.AdditiveBlending
+            });
+            const accretionDisk = new THREE.Mesh(accretionDiskGeometry, accretionDiskMaterial);
+            accretionDisk.rotation.x = Math.PI / 2;
+            scene.add(accretionDisk);
+            
+            // Gravitational lensing effect (outer glow)
+            const lensGeometry = new THREE.SphereGeometry(blackHoleRadius * 1.1, 32, 32);
+            const lensMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 }
+                },
+                vertexShader: `
+                    varying vec3 vNormal;
+                    void main() {
+                        vNormal = normalize(normalMatrix * normal);
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    varying vec3 vNormal;
+                    
+                    void main() {
+                        float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 4.0);
+                        gl_FragColor = vec4(0.3, 0.6, 1.0, 1.0) * intensity;
+                    }
+                `,
+                blending: THREE.AdditiveBlending,
+                transparent: true,
+                side: THREE.BackSide
+            });
+            const lensEffect = new THREE.Mesh(lensGeometry, lensMaterial);
+            scene.add(lensEffect);
+            
+            // Particle jets
+            const jetVertices = [];
+            const jetColors = [];
+            const jetCount = 2000;
+            const jetHeight = 70;
+            const jetRadius = 3;
+            
+            for (let i = 0; i < jetCount; i++) {
+                // Top jet
+                const t = Math.random();
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * jetRadius * (1 - t);
+                
+                jetVertices.push(
+                    Math.cos(angle) * radius,
+                    t * jetHeight,
+                    Math.sin(angle) * radius
+                );
+                
+                // Bluish color with variation
+                const blue = 0.5 + 0.5 * t;
+                jetColors.push(0.2 * t, 0.5 * t, blue);
+                
+                // Bottom jet (mirrored)
+                jetVertices.push(
+                    Math.cos(angle) * radius,
+                    -t * jetHeight,
+                    Math.sin(angle) * radius
+                );
+                
+                jetColors.push(0.2 * t, 0.5 * t, blue);
+            }
+            
+            const jetGeometry = new THREE.BufferGeometry();
+            jetGeometry.setAttribute('position', new THREE.Float32BufferAttribute(jetVertices, 3));
+            jetGeometry.setAttribute('color', new THREE.Float32BufferAttribute(jetColors, 3));
+            
+            const jetMaterial = new THREE.PointsMaterial({
+                size: 0.4,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+            
+            const jets = new THREE.Points(jetGeometry, jetMaterial);
+            scene.add(jets);
+            
+            // Group all black hole elements
+            const hub = new THREE.Group();
+            hub.add(blackHole);
+            hub.add(accretionDisk);
+            hub.add(lensEffect);
+            hub.add(jets);
 
-            // Planets (Sprites with Faces) and Rings
+            // Celestial Sun-like Bodies (replacing sprite faces) and Rings
             const planets = [];
             const rings = [];
+            const planetGroups = [];
             const positions = [
                 { x: -40, y: 25, z: -20 }, // LOCSEA
                 { x: 40, y: 23, z: -15 },  // ROBTAY
                 { x: -35, y: -25, z: -20 }, // MCISAM
                 { x: 35, y: -45, z: -35 }  // ENCMIG
             ];
-            const faceTextures = [
-                'trump.jpeg', // Replace with your PNG paths or URLs
-                'puff.jpeg',
-                'luna.jpeg',
-                'poptart.jpeg'
+            
+            // Define colors for each sun
+            const sunColors = [
+                { core: 0xffaa00, surface: 0xff5500, corona: 0xff9966 }, // Orange star
+                { core: 0x66ccff, surface: 0x0088ff, corona: 0x66ddff }, // Blue star
+                { core: 0xff3300, surface: 0xdd0000, corona: 0xff6644 }, // Red star
+                { core: 0xaaffaa, surface: 0x33cc33, corona: 0x88ffaa }  // Green star
             ];
+            
             const loader = new THREE.TextureLoader();
+            
             chartLabels.forEach((name, index) => {
-                const texture = loader.load(faceTextures[index]);
-                const planetMaterial = new THREE.SpriteMaterial({ map: texture });
-                const planet = new THREE.Sprite(planetMaterial);
-                planet.scale.set(25, 25, 3); // Size of the face
-                planet.position.set(positions[index].x, positions[index].y, positions[index].z);
-                planet.userData = { name, sales: 0, goal: goalData[index], index };
-                scene.add(planet);
-                planets.push(planet);
-
-                const ringGeometry = new THREE.TorusGeometry(21, 0.6, 48, 100);
-                const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xff007a, side: THREE.DoubleSide });
+                // Create a group for this planet system
+                const planetGroup = new THREE.Group();
+                planetGroup.position.set(positions[index].x, positions[index].y, positions[index].z);
+                
+                // Sun core - the main visible sphere
+                const sunRadius = 12;
+                const coreGeometry = new THREE.SphereGeometry(sunRadius, 64, 64);
+                
+                // Create a shader material for the sun's surface
+                const sunMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        coreColor: { value: new THREE.Color(sunColors[index].core) },
+                        surfaceColor: { value: new THREE.Color(sunColors[index].surface) }
+                    },
+                    vertexShader: `
+                        varying vec2 vUv;
+                        varying vec3 vNormal;
+                        
+                        void main() {
+                            vUv = uv;
+                            vNormal = normalize(normalMatrix * normal);
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform float time;
+                        uniform vec3 coreColor;
+                        uniform vec3 surfaceColor;
+                        varying vec2 vUv;
+                        varying vec3 vNormal;
+                        
+                        // Simplex noise functions
+                        vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                        vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                        vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+                        
+                        float snoise(vec2 v) {
+                            const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+                            vec2 i  = floor(v + dot(v, C.yy));
+                            vec2 x0 = v - i + dot(i, C.xx);
+                            vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+                            vec4 x12 = x0.xyxy + C.xxzz;
+                            x12.xy -= i1;
+                            i = mod289(i);
+                            vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+                            vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
+                            m = m*m;
+                            m = m*m;
+                            vec3 x = 2.0 * fract(p * C.www) - 1.0;
+                            vec3 h = abs(x) - 0.5;
+                            vec3 ox = floor(x + 0.5);
+                            vec3 a0 = x - ox;
+                            m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+                            vec3 g;
+                            g.x = a0.x * x0.x + h.x * x0.y;
+                            g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+                            return 130.0 * dot(m, g);
+                        }
+                        
+                        void main() {
+                            // Create sun surface with noise
+                            float n1 = snoise(vUv * 10.0 + vec2(time * 0.1, 0.0));
+                            float n2 = snoise(vUv * 8.0 - vec2(0.0, time * 0.08));
+                            float n3 = snoise(vUv * 15.0 + vec2(time * 0.03, time * 0.05));
+                            
+                            // Combine noise for natural looking turbulence
+                            float turbulence = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+                            
+                            // Edge highlight for sphere
+                            float fresnel = pow(1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+                            
+                            // Color mixing
+                            vec3 finalColor = mix(coreColor, surfaceColor, turbulence * 0.5 + 0.5);
+                            finalColor = mix(finalColor, surfaceColor * 1.5, fresnel * 0.7);
+                            
+                            // Hot spots
+                            float hotspot = step(0.83 - turbulence * 0.1, snoise(vUv * 5.0 + time * 0.02));
+                            finalColor += hotspot * 0.6 * surfaceColor;
+                            
+                            gl_FragColor = vec4(finalColor, 1.0);
+                        }
+                    `
+                });
+                
+                const sun = new THREE.Mesh(coreGeometry, sunMaterial);
+                
+                // Corona (outer glow)
+                const coronaGeometry = new THREE.SphereGeometry(sunRadius * 1.2, 32, 32);
+                const coronaMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        color: { value: new THREE.Color(sunColors[index].corona) }
+                    },
+                    vertexShader: `
+                        varying vec3 vNormal;
+                        void main() {
+                            vNormal = normalize(normalMatrix * normal);
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform float time;
+                        uniform vec3 color;
+                        varying vec3 vNormal;
+                        
+                        void main() {
+                            // Create soft glow at edges
+                            float intensity = pow(0.65 - dot(vNormal, vec3(0, 0, 1)), 2.0);
+                            
+                            // Add some time-based variation
+                            intensity *= 0.8 + 0.2 * sin(time * 0.5 + vNormal.x * 10.0);
+                            
+                            gl_FragColor = vec4(color, intensity);
+                        }
+                    `,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.BackSide
+                });
+                
+                const corona = new THREE.Mesh(coronaGeometry, coronaMaterial);
+                
+                // Solar flares as particle system
+                const flareCount = 2000;
+                const flareGeometry = new THREE.BufferGeometry();
+                const flarePositions = [];
+                const flareSizes = [];
+                const flareColors = [];
+                
+                for (let i = 0; i < flareCount; i++) {
+                    // Create particles in spherical coords but extending beyond surface
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    
+                    // Vary distances to create a volumetric corona
+                    const distance = sunRadius * (1.1 + Math.pow(Math.random(), 2) * 0.5);
+                    
+                    const x = distance * Math.sin(phi) * Math.cos(theta);
+                    const y = distance * Math.sin(phi) * Math.sin(theta);
+                    const z = distance * Math.cos(phi);
+                    
+                    flarePositions.push(x, y, z);
+                    
+                    // Size varies with distance
+                    const distFactor = (distance - sunRadius) / (sunRadius * 0.5);
+                    flareSizes.push(0.5 + Math.random() * 1.5 * (1 - distFactor));
+                    
+                    // Color varies with distance
+                    const colorBase = new THREE.Color(sunColors[index].corona);
+                    const intensity = 1 - distFactor;
+                    flareColors.push(
+                        colorBase.r * intensity,
+                        colorBase.g * intensity, 
+                        colorBase.b * intensity
+                    );
+                }
+                
+                flareGeometry.setAttribute('position', new THREE.Float32BufferAttribute(flarePositions, 3));
+                flareGeometry.setAttribute('size', new THREE.Float32BufferAttribute(flareSizes, 1));
+                flareGeometry.setAttribute('color', new THREE.Float32BufferAttribute(flareColors, 3));
+                
+                const flareMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        pixelRatio: { value: window.devicePixelRatio }
+                    },
+                    vertexShader: `
+                        attribute float size;
+                        attribute vec3 color;
+                        uniform float time;
+                        uniform float pixelRatio;
+                        varying vec3 vColor;
+                        
+                        void main() {
+                            vColor = color;
+                            
+                            // Animated position
+                            vec3 pos = position;
+                            float noise = sin(time + position.x * 10.0) * cos(time * 0.5 + position.y * 8.0) * 0.1;
+                            pos += position * noise;
+                            
+                            vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                            gl_PointSize = size * pixelRatio * (50.0 / -mvPosition.z);
+                            gl_Position = projectionMatrix * mvPosition;
+                        }
+                    `,
+                    fragmentShader: `
+                        varying vec3 vColor;
+                        
+                        void main() {
+                            float r = length(gl_PointCoord - vec2(0.5, 0.5));
+                            if (r > 0.5) discard;
+                            
+                            float intensity = 1.0 - r * 2.0;
+                            intensity = pow(intensity, 1.5);
+                            
+                            gl_FragColor = vec4(vColor, intensity * 0.4);
+                        }
+                    `,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                
+                const flares = new THREE.Points(flareGeometry, flareMaterial);
+                
+                // Add everything to planet group
+                planetGroup.add(sun);
+                planetGroup.add(corona);
+                planetGroup.add(flares);
+                
+                // Store userData on sun object for interaction
+                sun.userData = { name, sales: 0, goal: goalData[index], index };
+                planets.push(sun); // Use the sun as our main interaction object
+                
+                // Ring (progress indicator)
+                const ringGeometry = new THREE.TorusGeometry(sunRadius * 1.7, 1.2, 64, 128);
+                const ringMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0xff007a, 
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.8,
+                    emissive: 0xff007a,
+                    emissiveIntensity: 0.5
+                });
                 const ring = new THREE.Mesh(ringGeometry, ringMaterial);
                 ring.rotation.x = Math.PI / 2;
-                ring.position.copy(planet.position);
-                scene.add(ring);
+                planetGroup.add(ring);
                 rings.push(ring);
-
-                // Glowing Trail
-                // const trailGeometry = new THREE.BufferGeometry();
-                // const trailMaterial = new THREE.PointsMaterial({ color: 0x00d4ff, size: 0.3, transparent: true, opacity: 0.5 });
-                // const trailVertices = [];
-                // for (let i = 0; i < 50; i++) {
-                //     trailVertices.push(planet.position.x + Math.sin(i * 0.1) * 5, planet.position.y + i * 0.2 - 5, planet.position.z);
-                // }
-                // trailGeometry.setAttribute('position', new THREE.Float32BufferAttribute(trailVertices, 3));
-                // const trail = new THREE.Points(trailGeometry, trailMaterial);
-                // scene.add(trail);
+                
+                // Mini galaxy/orbit effect around the sun
+                const orbitGeometry = new THREE.BufferGeometry();
+                const orbitPositions = [];
+                const orbitColors = [];
+                
+                const orbitParticleCount = 1000;
+                const orbitRadius = sunRadius * 1.7; // Same as ring
+                const orbitWidth = 3;
+                
+                for (let i = 0; i < orbitParticleCount; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = orbitRadius + (Math.random() - 0.5) * orbitWidth;
+                    
+                    orbitPositions.push(
+                        Math.cos(angle) * radius,
+                        (Math.random() - 0.5) * 0.5, // Thin disc
+                        Math.sin(angle) * radius
+                    );
+                    
+                    // Orbit particles color
+                    const orbitColor = new THREE.Color(0xff007a);
+                    orbitColors.push(orbitColor.r, orbitColor.g, orbitColor.b);
+                }
+                
+                orbitGeometry.setAttribute('position', new THREE.Float32BufferAttribute(orbitPositions, 3));
+                orbitGeometry.setAttribute('color', new THREE.Float32BufferAttribute(orbitColors, 3));
+                
+                const orbitMaterial = new THREE.PointsMaterial({
+                    size: 0.5,
+                    transparent: true,
+                    opacity: 0.6,
+                    vertexColors: true,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                const orbitParticles = new THREE.Points(orbitGeometry, orbitMaterial);
+                planetGroup.add(orbitParticles);
+                
+                // Add the whole group to the scene
+                scene.add(planetGroup);
+                planetGroups.push(planetGroup);
             });
-            console.log(`Created ${planets.length} planets and ${rings.length} rings`);
+            
+            console.log(`Created ${planets.length} celestial bodies and ${rings.length} rings`);
 
             camera.position.set(0, 20, 60);
             camera.lookAt(0, 0, 0);
 
-            // Animation Loop
+            // Animation Loop with updated animations for all celestial objects
             function animate() {
                 requestAnimationFrame(animate);
-                stars.rotation.y += 0.0005;
-                nebula.rotation.y += 0.0002;
+                
+                // Update time uniforms for all shader materials
+                const time = performance.now() * 0.001; // seconds
+                
+                // Update black hole effects
+                if (accretionDisk && accretionDisk.material.uniforms) {
+                    accretionDisk.material.uniforms.time.value = time;
+                }
+                if (lensEffect && lensEffect.material.uniforms) {
+                    lensEffect.material.uniforms.time.value = time;
+                }
+                
+                // Rotate and pulse black hole elements
                 hub.rotation.y += 0.005;
-                gsap.to(hub.scale, { x: 1.1, y: 1.1, z: 1.1, duration: 1, yoyo: true, repeat: -1 });
-                planets.forEach((planet, i) => {
-                    rings[i].rotation.z += 0.005;
+                accretionDisk.rotation.z += 0.001;
+                gsap.to(blackHole.scale, { x: 1.05, y: 1.05, z: 1.05, duration: 1, yoyo: true, repeat: -1 });
+                
+                // Animate jets
+                const jetVertices = jets.geometry.attributes.position.array;
+                for (let i = 0; i < jetVertices.length; i += 3) {
+                    const x = jetVertices[i];
+                    const y = jetVertices[i + 1];
+                    const z = jetVertices[i + 2];
+                    
+                    // Add turbulence to x and z for jets
+                    const distance = Math.abs(y) / jetHeight;
+                    const turbulence = 0.1 * (1 - distance);
+                    
+                    jetVertices[i] = x + Math.sin(time * 2 + y * 0.1) * turbulence;
+                    jetVertices[i + 2] = z + Math.cos(time * 2 + y * 0.1) * turbulence;
+                }
+                jets.geometry.attributes.position.needsUpdate = true;
+                
+                // Update star twinkling
+                if (stars.material.uniforms) {
+                    stars.material.uniforms.time.value = time;
+                    stars.material.uniforms.pixelRatio.value = window.devicePixelRatio;
+                }
+                stars.rotation.y += 0.0001;
+                stars.rotation.x += 0.00005;
+                
+                // Animate nebula clouds
+                if (nebula.children) {
+                    nebula.children.forEach(cloud => {
+                        if (cloud.material && cloud.material.uniforms) {
+                            cloud.material.uniforms.time.value = time;
+                            cloud.material.uniforms.pixelRatio.value = window.devicePixelRatio;
+                        }
+                        
+                        if (cloud.userData && cloud.userData.rotationSpeed) {
+                            cloud.rotation.y += cloud.userData.rotationSpeed;
+                            cloud.rotation.z += cloud.userData.rotationSpeed * 0.7;
+                            
+                            // Orbit around central point
+                            if (cloud.userData.cloudCenter) {
+                                const center = cloud.userData.cloudCenter;
+                                const orbitRadius = 5;
+                                const orbitSpeed = 0.05;
+                                
+                                center.x += Math.sin(time * orbitSpeed) * orbitRadius * 0.01;
+                                center.y += Math.cos(time * orbitSpeed) * orbitRadius * 0.01;
+                                center.z += Math.sin(time * orbitSpeed * 1.3) * orbitRadius * 0.01;
+                            }
+                        }
+                    });
+                }
+                
+                // Animate sun-like celestial bodies
+                planetGroups.forEach((planetGroup, i) => {
+                    // Slowly rotate the entire system
+                    planetGroup.rotation.y += 0.001;
+                    
+                    // Update shader uniforms for all sun objects
+                    planetGroup.children.forEach(child => {
+                        if (child.material && child.material.uniforms && child.material.uniforms.time) {
+                            child.material.uniforms.time.value = time;
+                            
+                            // Add pixelRatio for point materials
+                            if (child.material.uniforms.pixelRatio) {
+                                child.material.uniforms.pixelRatio.value = window.devicePixelRatio;
+                            }
+                        }
+                    });
+                    
+                    // Rotate rings
+                    const ring = rings[i];
+                    if (ring) ring.rotation.z += 0.005;
+                    
+                    // Rotate orbit particles
+                    const orbitParticles = planetGroup.children.find(child => 
+                        child instanceof THREE.Points && 
+                        child.geometry.attributes.position.array.length > 2000
+                    );
+                    
+                    if (orbitParticles) {
+                        orbitParticles.rotation.y += 0.01;
+                    }
                 });
+                
                 renderer.render(scene, camera);
             }
             animate();
@@ -325,30 +1160,202 @@
             }
             updateCharts();
 
-            // Custom PNG Confetti Explosion
-            function explodePlanet(planet) {
-                const confettiTexture = loader.load('confetti.png'); // Replace with your PNG path or URL
-                const confettiMaterial = new THREE.SpriteMaterial({ map: confettiTexture });
-                const confettiParticles = [];
-                for (let i = 0; i < 50; i++) {
-                    const sprite = new THREE.Sprite(confettiMaterial);
-                    sprite.scale.set(1, 1, 1);
-                    sprite.position.copy(planet.position);
-                    scene.add(sprite);
-                    confettiParticles.push(sprite);
-
+            // Custom Explosion Effect for celestial bodies reaching goals
+            function explodePlanet(planetGroup) {
+                // Get the position from the planet group
+                const position = planetGroup.position.clone();
+                
+                // Create spectacular particle explosion
+                const explosionParticleCount = 500;
+                const explosionGeometry = new THREE.BufferGeometry();
+                const explosionVertices = [];
+                const explosionColors = [];
+                const explosionSizes = [];
+                
+                // Extract color from the sun object
+                let sunColor = new THREE.Color(0xffaa00);
+                planetGroup.children.forEach(child => {
+                    if (child.material && child.material.uniforms && child.material.uniforms.surfaceColor) {
+                        sunColor = child.material.uniforms.surfaceColor.value.clone();
+                    }
+                });
+                
+                // Create particles in all directions
+                for (let i = 0; i < explosionParticleCount; i++) {
                     const theta = Math.random() * Math.PI * 2;
-                    const phi = Math.random() * Math.PI;
-                    const r = Math.random() * 10;
-                    gsap.to(sprite.position, {
-                        x: planet.position.x + r * Math.sin(phi) * Math.cos(theta),
-                        y: planet.position.y + r * Math.sin(phi) * Math.sin(theta),
-                        z: planet.position.z + r * Math.cos(phi),
-                        duration: 2,
-                        onComplete: () => scene.remove(sprite)
-                    });
-                    gsap.to(sprite.scale, { x: 0, y: 0, z: 0, duration: 2 });
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    
+                    // Random distance for initial particle positions
+                    const distance = 5 + Math.random() * 10;
+                    
+                    const x = position.x + distance * Math.sin(phi) * Math.cos(theta);
+                    const y = position.y + distance * Math.sin(phi) * Math.sin(theta);
+                    const z = position.z + distance * Math.cos(phi);
+                    
+                    explosionVertices.push(x, y, z);
+                    
+                    // Vary particle sizes
+                    explosionSizes.push(1 + Math.random() * 3);
+                    
+                    // Create colors based on sun color with variation
+                    const colorIntensity = 0.7 + Math.random() * 0.3;
+                    const particleColor = sunColor.clone();
+                    particleColor.r = Math.min(1, particleColor.r * colorIntensity * 1.2);
+                    particleColor.g = Math.min(1, particleColor.g * colorIntensity * 1.2);
+                    particleColor.b = Math.min(1, particleColor.b * colorIntensity * 1.2);
+                    
+                    explosionColors.push(particleColor.r, particleColor.g, particleColor.b);
                 }
+                
+                explosionGeometry.setAttribute('position', new THREE.Float32BufferAttribute(explosionVertices, 3));
+                explosionGeometry.setAttribute('color', new THREE.Float32BufferAttribute(explosionColors, 3));
+                explosionGeometry.setAttribute('size', new THREE.Float32BufferAttribute(explosionSizes, 1));
+                
+                const explosionMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        pixelRatio: { value: window.devicePixelRatio }
+                    },
+                    vertexShader: `
+                        attribute float size;
+                        attribute vec3 color;
+                        uniform float time;
+                        uniform float pixelRatio;
+                        varying vec3 vColor;
+                        varying float vAlpha;
+                        
+                        void main() {
+                            vColor = color;
+                            
+                            // Fade out over time
+                            vAlpha = 1.0 - time;
+                            
+                            // Particles move outward
+                            vec3 pos = position;
+                            vec3 dir = normalize(position - vec3(${position.x}, ${position.y}, ${position.z}));
+                            float speed = 5.0 + 20.0 * time;
+                            pos += dir * time * speed;
+                            
+                            vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                            gl_PointSize = size * pixelRatio * (300.0 / -mvPosition.z);
+                            gl_Position = projectionMatrix * mvPosition;
+                        }
+                    `,
+                    fragmentShader: `
+                        varying vec3 vColor;
+                        varying float vAlpha;
+                        
+                        void main() {
+                            if (vAlpha <= 0.0) discard;
+                            
+                            float r = length(gl_PointCoord - vec2(0.5, 0.5));
+                            if (r > 0.5) discard;
+                            
+                            float intensity = 1.0 - pow(r * 2.0, 1.5);
+                            gl_FragColor = vec4(vColor, vAlpha * intensity);
+                        }
+                    `,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                
+                const explosion = new THREE.Points(explosionGeometry, explosionMaterial);
+                scene.add(explosion);
+                
+                // Animate the explosion
+                let duration = 0;
+                const maxDuration = 2; // seconds
+                
+                function animateExplosion() {
+                    if (duration >= maxDuration) {
+                        scene.remove(explosion);
+                        return;
+                    }
+                    
+                    requestAnimationFrame(animateExplosion);
+                    duration += 0.016; // ~60fps
+                    
+                    explosionMaterial.uniforms.time.value = duration / maxDuration;
+                }
+                
+                animateExplosion();
+                
+                // Add a bright flash
+                const flashGeometry = new THREE.SphereGeometry(20, 32, 32);
+                const flashMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 1,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+                flash.position.copy(position);
+                scene.add(flash);
+                
+                // Animate flash
+                gsap.to(flash.scale, { x: 3, y: 3, z: 3, duration: 0.5 });
+                gsap.to(flashMaterial, { 
+                    opacity: 0, 
+                    duration: 0.5,
+                    onComplete: () => scene.remove(flash)
+                });
+                
+                // Add shockwave effect
+                const shockwaveGeometry = new THREE.RingGeometry(0.1, 0.5, 32);
+                const shockwaveMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        color: { value: new THREE.Color(sunColor) }
+                    },
+                    vertexShader: `
+                        varying vec2 vUv;
+                        void main() {
+                            vUv = uv;
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform float time;
+                        uniform vec3 color;
+                        varying vec2 vUv;
+                        
+                        void main() {
+                            float intensity = 1.0 - time;
+                            float ring = 1.0 - abs(vUv.y - 0.5) * 2.0;
+                            ring = pow(ring, 3.0);
+                            gl_FragColor = vec4(color, intensity * ring);
+                        }
+                    `,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                const shockwave = new THREE.Mesh(shockwaveGeometry, shockwaveMaterial);
+                shockwave.position.copy(position);
+                scene.add(shockwave);
+                
+                // Animate shockwave
+                let shockwaveTime = 0;
+                const shockwaveDuration = 1.5; // seconds
+                
+                function animateShockwave() {
+                    if (shockwaveTime >= shockwaveDuration) {
+                        scene.remove(shockwave);
+                        return;
+                    }
+                    
+                    requestAnimationFrame(animateShockwave);
+                    shockwaveTime += 0.016;
+                    
+                    shockwaveMaterial.uniforms.time.value = shockwaveTime / shockwaveDuration;
+                    const scale = 100 * (shockwaveTime / shockwaveDuration);
+                    shockwave.scale.set(scale, scale, scale);
+                }
+                
+                animateShockwave();
             }
 
             // Raycaster for Interactivity
@@ -450,7 +1457,41 @@
                         planet.userData.sales = salesData[i];
                         const percentage = Math.min((salesData[i] / goalData[i]) * 100, 100);
                         gsap.to(rings[i].scale, { x: percentage / 100, y: percentage / 100, z: 1, duration: 1 });
-                        if (percentage >= 100) explodePlanet(planet);
+                        
+                        if (percentage >= 100) {
+                            // Trigger celebration effect
+                            explodePlanet(planetGroups[i]);
+                            
+                            // Make sun glow brighter
+                            planetGroups[i].children.forEach(child => {
+                                if (child.material && child.material.uniforms) {
+                                    if (child.material.uniforms.coreColor) {
+                                        const originalColor = new THREE.Color(sunColors[i].core);
+                                        gsap.to(child.material.uniforms.coreColor.value, {
+                                            r: originalColor.r * 1.5,
+                                            g: originalColor.g * 1.5,
+                                            b: originalColor.b * 1.5,
+                                            duration: 1,
+                                            yoyo: true,
+                                            repeat: 3
+                                        });
+                                    }
+                                    
+                                    if (child.material.uniforms.surfaceColor) {
+                                        const originalColor = new THREE.Color(sunColors[i].surface);
+                                        gsap.to(child.material.uniforms.surfaceColor.value, {
+                                            r: originalColor.r * 1.5,
+                                            g: originalColor.g * 1.5,
+                                            b: originalColor.b * 1.5,
+                                            duration: 1,
+                                            yoyo: true,
+                                            repeat: 3
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                        
                         console.log(`Planet ${planet.userData.name}: Sales=${salesData[i]}, Goal=${goalData[i]}, Percentage=${percentage}%`);
                     });
                     updateCharts();
