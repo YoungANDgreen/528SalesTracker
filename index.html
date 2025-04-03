@@ -866,14 +866,18 @@
                 
                 // Ring (progress indicator)
                 const ringGeometry = new THREE.TorusGeometry(sunRadius * 1.7, 1.2, 64, 128);
-                const ringMaterial = new THREE.MeshBasicMaterial({ 
+                
+                // Use MeshPhongMaterial which supports emissive properties
+                const ringMaterial = new THREE.MeshPhongMaterial({ 
                     color: 0xff007a, 
                     side: THREE.DoubleSide,
                     transparent: true,
                     opacity: 0.8,
                     emissive: 0xff007a,
-                    emissiveIntensity: 0.5
+                    emissiveIntensity: 0.5,
+                    shininess: 100
                 });
+                
                 const ring = new THREE.Mesh(ringGeometry, ringMaterial);
                 ring.rotation.x = Math.PI / 2;
                 planetGroup.add(ring);
