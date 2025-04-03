@@ -169,15 +169,15 @@
                 rings.push(ring);
 
                 // Glowing Trail
-                const trailGeometry = new THREE.BufferGeometry();
-                const trailMaterial = new THREE.PointsMaterial({ color: 0x00d4ff, size: 0.3, transparent: true, opacity: 0.5 });
-                const trailVertices = [];
-                for (let i = 0; i < 50; i++) {
-                    trailVertices.push(planet.position.x + Math.sin(i * 0.1) * 5, planet.position.y + i * 0.2 - 5, planet.position.z);
-                }
-                trailGeometry.setAttribute('position', new THREE.Float32BufferAttribute(trailVertices, 3));
-                const trail = new THREE.Points(trailGeometry, trailMaterial);
-                scene.add(trail);
+                // const trailGeometry = new THREE.BufferGeometry();
+                // const trailMaterial = new THREE.PointsMaterial({ color: 0x00d4ff, size: 0.3, transparent: true, opacity: 0.5 });
+                // const trailVertices = [];
+                // for (let i = 0; i < 50; i++) {
+                //     trailVertices.push(planet.position.x + Math.sin(i * 0.1) * 5, planet.position.y + i * 0.2 - 5, planet.position.z);
+                // }
+                // trailGeometry.setAttribute('position', new THREE.Float32BufferAttribute(trailVertices, 3));
+                // const trail = new THREE.Points(trailGeometry, trailMaterial);
+                // scene.add(trail);
             });
             console.log(`Created ${planets.length} planets and ${rings.length} rings`);
 
