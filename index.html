@@ -1272,26 +1272,26 @@
                 }
             });
 
-            window.addEventListener('click', (event) => {
-                mouse.x = (event.clientX / (window.innerWidth * 0.75)) * 2 - 1;
-                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-                raycaster.setFromCamera(mouse, camera);
-                const intersects = raycaster.intersectObjects(planets);
-                if (intersects.length > 0) {
-                    const planet = intersects[0].object;
-                    if (selectedPlanet !== planet) {
-                        selectedPlanet = planet;
-                        gsap.to(planet.scale, { x: 35, y: 35, z: 4, duration: 0.5 });
-                        planets.forEach(p => { if (p !== planet) gsap.to(p.scale, { x: 2, y: 2, z: 1, duration: 0.5 }); });
-                        const percentage = planet.userData.sales / planet.userData.goal * 100;
-                        if (percentage >= 100) {
-                            explodePlanet(planet);
-                        } else {
-                            gsap.to(rings[planet.userData.index].scale, { x: 1.2, y: 1.2, z: 1, duration: 0.5, yoyo: true, repeat: 1 });
-                        }
-                    }
-                }
-            });
+            // window.addEventListener('click', (event) => {
+            //     mouse.x = (event.clientX / (window.innerWidth * 0.75)) * 2 - 1;
+            //     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            //     raycaster.setFromCamera(mouse, camera);
+            //     const intersects = raycaster.intersectObjects(planets);
+            //     if (intersects.length > 0) {
+            //         const planet = intersects[0].object;
+            //         if (selectedPlanet !== planet) {
+            //             selectedPlanet = planet;
+            //             gsap.to(planet.scale, { x: 35, y: 35, z: 4, duration: 0.5 });
+            //             planets.forEach(p => { if (p !== planet) gsap.to(p.scale, { x: 2, y: 2, z: 1, duration: 0.5 }); });
+            //             const percentage = planet.userData.sales / planet.userData.goal * 100;
+            //             if (percentage >= 100) {
+            //                 explodePlanet(planet);
+            //             } else {
+            //                 gsap.to(rings[planet.userData.index].scale, { x: 1.2, y: 1.2, z: 1, duration: 0.5, yoyo: true, repeat: 1 });
+            //             }
+            //         }
+            //     }
+            // });
 
             // File Upload Handler
             document.getElementById('fileInput').addEventListener('change', function (event) {
